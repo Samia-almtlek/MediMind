@@ -21,6 +21,24 @@ class _HomeScreenState extends State<HomeScreen> {
   //dit is nu een lege lijst om later te vullen via de API of db
   List<Medication> activeMeds = [];
 
+  String _getMonthName(DateTime date) {
+    List<String> months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    return "${months[date.month - 1]} ${date.year}";
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,65 +69,69 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.backgroundWhite,
+    appBar: AppBar(
+      title: Text("Today", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+      centerTitle: true,
       backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(
-        title: Text("Today", style: TextStyle(color: Colors.black)),
-        centerTitle: true,
-        backgroundColor: AppColors.backgroundWhite,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.more_horiz, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          //hrizontal calendar showing the week
-          _buildHorizontalCalendar(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-            child: Text(
-              selectedDate.day == today.day
-                  ? "Today's Schedule"
-                  : "Schedule for ${selectedDate.day}/${selectedDate.month}",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      elevation: 0,
+      actions: [
+        IconButton(icon: Icon(Icons.more_horiz, color: Colors.black), onPressed: () {})
+      ],
+    ),
+    body: Column( // <--- HIER BEGINT DE COLUMN
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. De Maand-indicator (NIEUW)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Text(
+            _getMonthName(selectedDate),
+            style: TextStyle(
+              fontSize: 20, 
+              fontWeight: FontWeight.bold, 
+              color: AppColors.iconGrey
             ),
           ),
-          Expanded(
-            child: _getListForSelectedDate().isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "No medication scheduled for this day.",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        Text(
-                          "Click + to add medication",
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  )
-                : _buildMedicationList(_getListForSelectedDate()),
+        ),
+
+        // 2. De Kalender
+        _buildHorizontalCalendar(),
+
+        // 3. De Dynamische Titel (Vandaag of Geselecteerde Datum)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+          child: Text(
+            DateUtils.isSameDay(selectedDate, today) 
+                ? "Today's Schedule" 
+                : "Schedule for ${selectedDate.day} ${_getMonthName(selectedDate).split(' ')[0]}", 
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        // 4. De Lijst (of Empty State)
+        Expanded(
+          child: _getListForSelectedDate().isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 50, color: Colors.grey),
+                      SizedBox(height: 10),
+                      Text("No medication scheduled for this day.", 
+                          style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              : _buildMedicationList(_getListForSelectedDate()),
+        ),
+      ],
+    ),
+  );
+}
 
   // Builds a horizontal calendar automatically
   Widget _buildHorizontalCalendar() {
