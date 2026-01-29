@@ -10,6 +10,7 @@ class ManualInputScreen extends StatefulWidget {
 class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController dosageController = TextEditingController();
+  final TextEditingController notesController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +43,24 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
               controller: dosageController,
               decoration: InputDecoration(hintText: "e.g., 500 mg"),
             ),
+            SizedBox(height: 20),
+            //for additional notes or remarks about the medication
+            Text("Notes (Optional)", style: TextStyle(fontWeight: FontWeight.bold)),
+              TextField(
+                controller: notesController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: "e.g., Take with food, avoid alcohol...",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primaryBlue),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+
             Spacer(),
             SSurfaceButton(
               text: "Next",
@@ -62,6 +81,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                 }
               },
             ),
+            SizedBox(height: 20),
           ],
         ),
       ),
