@@ -70,9 +70,14 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TreatmentDurationScreen(),
+                      builder: (context) => TreatmentDurationScreen(
+                        medicationName: nameController.text,
+                        dosage: dosageController.text,
+                        notes: notesController.text.isNotEmpty ? notesController.text : null,
+                      ),
                     ),
                   );
+  
                 } else {
                   // Small check so they can't click 'Next' without a name
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -81,7 +86,6 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                 }
               },
             ),
-            SizedBox(height: 20),
           ],
         ),
       ),
