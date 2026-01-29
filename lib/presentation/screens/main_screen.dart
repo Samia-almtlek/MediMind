@@ -30,7 +30,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      // The Floating Action Button (The Plus Sign)
+      // The Floating Action Button
       floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
         backgroundColor: AppColors.primaryBlue,
         child: Icon(Icons.add, color: Colors.white, size: 30),
@@ -42,6 +42,7 @@ class _MainScreenState extends State<MainScreen> {
 },
       ) : null,
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: AppColors.backgroundWhite,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
