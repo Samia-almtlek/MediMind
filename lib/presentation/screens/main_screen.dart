@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_screens.dart';
+import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
@@ -34,9 +35,11 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: AppColors.primaryBlue,
         child: Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
-          // this is to navigate later to AddMedicationChoiceScreen
-          print("Add medication clicked");
-        },
+  Navigator.push(
+    context, 
+    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+  );
+},
       ) : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
