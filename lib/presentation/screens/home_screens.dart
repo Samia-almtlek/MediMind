@@ -21,6 +21,10 @@ class _HomeScreenState extends State<HomeScreen> {
   //dit is nu een lege lijst om later te vullen via de API of db
   List<Medication> activeMeds = [];
 
+  final ScrollController _scrollController = ScrollController(
+    initialScrollOffset: 500 * 68.0 - 150,
+  );
+
   String _getMonthName(DateTime date) {
     List<String> months = [
       "January",
@@ -69,75 +73,87 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
   }
 
- @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    backgroundColor: AppColors.backgroundWhite,
-    appBar: AppBar(
-      title: Text("Today", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-      centerTitle: true,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      elevation: 0,
-      actions: [
-        IconButton(icon: Icon(Icons.more_horiz, color: Colors.black), onPressed: () {})
-      ],
-    ),
-    body: Column( // <--- HIER BEGINT DE COLUMN
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. De Maand-indicator (NIEUW)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Text(
-            _getMonthName(selectedDate),
-            style: TextStyle(
-              fontSize: 20, 
-              fontWeight: FontWeight.bold, 
-              color: AppColors.iconGrey
+      appBar: AppBar(
+        title: Text(
+          "Today",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.backgroundWhite,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.more_horiz, color: Colors.black),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: Column(
+        // <--- HIER BEGINT DE COLUMN
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. De Maand-indicator (NIEUW)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: Text(
+              _getMonthName(selectedDate),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.iconGrey,
+              ),
             ),
           ),
-        ),
 
-        // 2. De Kalender
-        _buildHorizontalCalendar(),
+          _buildHorizontalCalendar(),
 
-        // 3. De Dynamische Titel (Vandaag of Geselecteerde Datum)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-          child: Text(
-            DateUtils.isSameDay(selectedDate, today) 
-                ? "Today's Schedule" 
-                : "Schedule for ${selectedDate.day} ${_getMonthName(selectedDate).split(' ')[0]}", 
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            child: Text(
+              DateUtils.isSameDay(selectedDate, today)
+                  ? "Today's Schedule"
+                  : "Schedule for ${selectedDate.day} ${_getMonthName(selectedDate).split(' ')[0]}",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
-        ),
 
-        // 4. De Lijst (of Empty State)
-        Expanded(
-          child: _getListForSelectedDate().isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.calendar_today_outlined, size: 50, color: Colors.grey),
-                      SizedBox(height: 10),
-                      Text("No medication scheduled for this day.", 
-                          style: TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                )
-              : _buildMedicationList(_getListForSelectedDate()),
-        ),
-      ],
-    ),
-  );
-}
+          // 4. De Lijst (of Empty State)
+          Expanded(
+            child: _getListForSelectedDate().isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "No medication scheduled for this day.",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildMedicationList(_getListForSelectedDate()),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Builds a horizontal calendar automatically
   Widget _buildHorizontalCalendar() {
     return Container(
       height: 100,
       child: ListView.builder(
+        controller: _scrollController,
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
           //  berekent de datum voor elke kaart relatief aan vandaag
