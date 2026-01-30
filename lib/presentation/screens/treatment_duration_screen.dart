@@ -116,7 +116,14 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () => print("Schedule Finalized"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SuccessScreen(medicationName: widget.medicationName),
+                  ),
+                );
+              },
               child: Text(
                 "Confirm & Save",
                 style: TextStyle(color: Colors.white, fontSize: 18),
