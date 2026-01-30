@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'presentation/screens/add_medication_method_screen.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -112,10 +114,22 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+ floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AddMedicationMethodScreen(),
+            ),
+          );
+        },
+        label: const Text(
+          'Add medication',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
