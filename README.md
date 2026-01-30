@@ -49,10 +49,19 @@ Een kort overzicht van hoe de applicatie is opgebouwd:
 
 ---
 
-## Installatie
+## Installatie & Setup
 
-Wil je MediMind lokaal draaien? Volg deze stappen:
+Volg de onderstaande stappen om MediMind lokaal op je machine te draaien.
 
-1.  **Clone de repo**
-    ```bash
-    git clone
+### 1. Vereisten
+Zorg ervoor dat de volgende software op je systeem is geïnstalleerd:
+* **Flutter SDK**: [Download de laatste versie](https://docs.flutter.dev/get-started/install).
+* **Dart SDK**: Wordt meestal meegeleverd met Flutter.
+* **Git**: Voor het clonen van de repository.
+* **IDE**: We raden **VS Code** (met Flutter & Dart extensies) of **Android Studio** aan.
+
+### 2. De Repository Clonen
+Open je terminal en voer het volgende commando uit:
+```bash
+git clone [[https://github.com/JOUW_GEBRUIKERSNAAM/medimind.git](https://github.com/JOUW_GEBRUIKERSNAAM/medimind.git)](https://github.com/Samia-almtlek/MediMind.git) 
+cd medimind
