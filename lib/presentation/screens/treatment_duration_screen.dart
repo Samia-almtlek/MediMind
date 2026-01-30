@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:intl/intl.dart';
+import 'success_screen.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
