@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/global_data.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -50,27 +51,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadInitialData() {
-    // Simuleer het inladen van data (straks komt dit uit Firestore)
+    // (straks komt dit uit Firestore)
     setState(() {
-      activeMeds = [
-        Medication(name: "Paracetamol", dosage: "500 mg", time: "08:00 AM"),
-        Medication(
-          name: "Insulin Glargine",
-          dosage: "Target dose",
-          time: "09:30 AM",
-          isTaken: true,
-        ),
-      ];
+      activeMeds = [];
     });
   }
 
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
   // For now: Returns empty list to show "No medication" view
   List<Medication> _getListForSelectedDate() {
-    return activeMeds.where((med) {
-      // TODO: Add logic to check if 'med' is active on 'selectedDate'
-      return false; // Forces the "No medication" view
-    }).toList();
+    if(DateUtils.isSameDay(selectedDate, today)){
+      return userAddedMeds;
+    }
+    return [];
+  }
+
+  /// Adds a new medication to the active medications list
+  void _addNewMedication(Medication newMed) {
+    setState(() {
+      activeMeds.add(newMed);
+    });
   }
 
   @override
@@ -93,10 +93,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: Column(
-        // <--- HIER BEGINT DE COLUMN
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. De Maand-indicator (NIEUW)
+          // De Maand-indicator
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Text(
@@ -121,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 4. De Lijst (of Empty State)
+          //  Lijst (of Empty State)
           Expanded(
             child: _getListForSelectedDate().isEmpty
                 ? Center(
@@ -169,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onTap: () {
               setState(() {
                 selectedDate = dateToShow;
-                // Hier filteren we later de data uit  database
+                // Hier filteren we later de data uit database
               });
             },
             child: Container(
@@ -212,55 +211,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Builds the list of medications for the day
-
   Widget _buildMedicationList(List<Medication> meds) {
     return ListView.builder(
-      padding: EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.symmetric(horizontal: 16),
       itemCount: meds.length,
       itemBuilder: (context, index) {
         final med = meds[index];
         return Container(
-          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          margin: EdgeInsets.only(bottom: 12),
           padding: EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.lightTeal,
+            color: AppColors.lightTeal.withOpacity(0.4),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Row(
             children: [
-              Icon(Icons.alarm, color: AppColors.iconGrey, size: 28),
-              SizedBox(width: 15),
+              // Time on the left side
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(med.time, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
+                  Text("Scheduled", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+              SizedBox(width: 20),
+              // Medication name and dosage
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      med.time,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      "${med.name} ${med.dosage}",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text(med.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(med.dosage, style: TextStyle(color: Colors.black54)),
                   ],
                 ),
               ),
+              // Checkbox from prototype
               Transform.scale(
-                scale: 1.3,
+                scale: 1.2,
                 child: Checkbox(
                   value: med.isTaken,
                   activeColor: AppColors.primaryBlue,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  onChanged: (val) {
-                    setState(() => med.isTaken = val!);
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                  onChanged: (bool? value) {
+                    setState(() {
+                      med.isTaken = value!;
+                    });
                   },
                 ),
               ),
