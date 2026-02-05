@@ -38,6 +38,10 @@ dependencies:
   # adding the intl package for date/time formatting and translations
   intl: ^0.19.0
 
+  
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -90,3 +94,4 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
