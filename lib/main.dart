@@ -3,7 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'presentation/screens/main_screen.dart';
 
-void main() async {
+
+Future<void> main() async {
   // Ensures that Flutter is fully initialized before using async code
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -12,19 +13,22 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+print('🔥 Firebase initialized successfully');
   // Start the Flutter application
-  runApp(const MyApp());
+  runApp(const MediMindApp());
 }
 
-/// Root widget 
+/// Root widget
 class MediMindApp extends StatelessWidget {
+  const MediMindApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // to hide debug banner in the corner
+      // Hide debug banner
       debugShowCheckedModeBanner: false,
-      // Set MainScreen as the initial screen
+
+      // Initial screen
       home: MainScreen(),
     );
   }
