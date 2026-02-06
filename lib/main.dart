@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'presentation/screens/main_screen.dart';
+import 'presentation/screens/splash_screen.dart';
 
 /// Entry point for the app
 void main() {
@@ -14,8 +14,8 @@ class MediMindApp extends StatelessWidget {
     return MaterialApp(
       // to hide debug banner in the corner
       debugShowCheckedModeBanner: false,
-      // Set MainScreen as the initial screen
-      home: MainScreen(),
+      // Set SplashScreen as the initial screen
+      home: SplashScreen(),
     );
   }
 }
