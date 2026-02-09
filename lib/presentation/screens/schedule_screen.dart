@@ -47,5 +47,80 @@ class ScheduleScreen extends StatelessWidget {
     );
   }
 
-
+  // Builds a list of treatment cards based on userAddedMeds
+  Widget _buildTreatmentList() {
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: userAddedMeds.length,
+      itemBuilder: (context, index) {
+        final med = userAddedMeds[index];
+        return Container(
+          margin: EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // icon for indicating medication type or status
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.lightTeal.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.medication, color: AppColors.primaryBlue),
+              ),
+              SizedBox(width: 16),
+              // details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      med.name,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      "Dosage: ${med.dosage}",
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "Time: ${med.time}",
+                      style: TextStyle(
+                        color: AppColors.primaryBlue,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // status badge
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  "Active",
+                  style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
