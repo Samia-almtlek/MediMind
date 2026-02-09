@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'home_screens.dart';
 import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
+import 'schedule_screen.dart';
+import 'chat_screen.dart';
+import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -15,9 +18,9 @@ class _MainScreenState extends State<MainScreen> {
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
     HomeScreen(), 
-    Center(child: Text("Schedule Page")), 
-    Center(child: Text("Chat Page")), 
-    Center(child: Text("Profile Page")),
+    ScheduleScreen(), 
+    ChatScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {

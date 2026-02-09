@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:medimind/utils/global_data.dart';
 import '../../utils/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'success_screen.dart';
+import '../../domain/models/medication.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
@@ -117,10 +119,23 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 ),
               ),
               onPressed: () {
+                // Create a medication entry for each selected time
+                for (var time in selectedTimes) {
+                  userAddedMeds.add(
+                    Medication(
+                      name: widget.medicationName,
+                      dosage: widget.dosage,
+                      time: time.format(context),
+                      isTaken: false,
+                    ),
+                  );
+                }
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => SuccessScreen(medicationName: widget.medicationName),
+                    builder: (context) =>
+                        SuccessScreen(medicationName: widget.medicationName),
                   ),
                 );
               },
