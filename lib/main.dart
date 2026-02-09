@@ -15,7 +15,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-print('🔥 Firebase initialized successfully');
+  print('Firebase initialized successfully');
   // Start the Flutter application
   runApp(const MediMindApp());
 }
@@ -29,9 +29,8 @@ class MediMindApp extends StatelessWidget {
     return MaterialApp(
       // Hide debug banner
       debugShowCheckedModeBanner: false,
-
-      // Initial screen
-      home: MainScreen(),
+  // Set SplashScreen as the initial screen
+  home: SplashScreen(),
     );
   }
 }
