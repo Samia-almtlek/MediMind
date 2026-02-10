@@ -75,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
@@ -265,4 +266,11 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+
+  @override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  // Dit zorgt ervoor dat telkens wanneer we terugkomen op dit scherm (bijvoorbeeld na Navigator.pop of switch in navbar), de UI ververst.
+  setState(() {}); 
+}
 }
