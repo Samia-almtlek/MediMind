@@ -71,8 +71,14 @@ class ScheduleScreen extends StatelessWidget {
   }
 
   Widget _buildTreatmentCard(Medication med) {
+    // responsible for determining if the treatment is still active or has finished based on the end date
+    final DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final DateTime endDateOnly = DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+    
+    bool isDatePassed = today.isAfter(endDateOnly);
+    bool isFullyCompleted = med.completedDates.any((d)=> DateUtils.isSameDay(d, endDateOnly));
     // Check if the current date is before the end date
-    final bool isActive = med.endDate.isAfter(DateTime.now());
+    final bool isActive = !isDatePassed && !isFullyCompleted;
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -132,13 +138,17 @@ class ScheduleScreen extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green[50] : Colors.grey[100],
+        color: isActive ? Colors.green[50] : Colors.red[50],
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: isActive ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+            width: 1,
+          ),
       ),
       child: Text(
-        isActive ? "Active" : "Finished",
+        isActive ? "Active" : "Inactive",
         style: TextStyle(
-          color: isActive ? Colors.green : Colors.grey, 
+          color: isActive ? Colors.green : Colors.red, 
           fontSize: 12, 
           fontWeight: FontWeight.bold
         ),
