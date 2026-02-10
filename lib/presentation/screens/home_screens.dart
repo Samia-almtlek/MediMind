@@ -10,12 +10,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /* Sample medication data
-  final List<Medication> dailyMeds = [
-    Medication(name: "Paracetamol", dosage: "500 mg", time: "08:00 AM"),
-    Medication(name: "Insulin Glargine", dosage: "Target dose", time: "09:30 AM", isTaken: true),
-    Medication(name: "Vitamin D", dosage: "2000 IU", time: "12:00 PM"),
-  ];*/
+  
+  
 
   DateTime selectedDate = DateTime.now(); // day the user is viewing
   DateTime today = DateTime.now();
@@ -60,10 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
   // For now: Returns empty list to show "No medication" view
   List<Medication> _getListForSelectedDate() {
-    if(DateUtils.isSameDay(selectedDate, today)){
-      return userAddedMeds;
-    }
-    return [];
+    return userAddedMeds.where((med) {
+      // We assume a course starts on the day it was added.
+      // For now we use today at 00:00 as the start date.
+      DateTime startDate = DateTime(today.year, today.month, today.day);
+
+      // Compare the selected date at 00:00 for an accurate comparison.
+      DateTime compareDate = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+      );
+
+      // End date of the course
+      DateTime limitDate = DateTime(
+        med.endDate.year,
+        med.endDate.month,
+        med.endDate.day,
+      );
+
+      // Show medication when selected date is within start and end date.
+      return !compareDate.isBefore(startDate) && !compareDate.isAfter(limitDate);
+    }).toList();
   }
 
   /// Adds a new medication to the active medications list
