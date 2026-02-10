@@ -57,26 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // For now: Returns empty list to show "No medication" view
   List<Medication> _getListForSelectedDate() {
     return userAddedMeds.where((med) {
-      // We assume a course starts on the day it was added.
-      // For now we use today at 00:00 as the start date.
-      DateTime startDate = DateTime(today.year, today.month, today.day);
-
-      // Compare the selected date at 00:00 for an accurate comparison.
-      DateTime compareDate = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-      );
-
-      // End date of the course
-      DateTime limitDate = DateTime(
-        med.endDate.year,
-        med.endDate.month,
-        med.endDate.day,
-      );
+      DateTime start = DateTime(today.year, today.month, today.day);
+      DateTime end = DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+      DateTime current = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
 
       // Show medication when selected date is within start and end date.
-      return !compareDate.isBefore(startDate) && !compareDate.isAfter(limitDate);
+      return !current.isBefore(start) && !current.isAfter(end);
     }).toList();
   }
 
@@ -264,12 +250,17 @@ class _HomeScreenState extends State<HomeScreen> {
               Transform.scale(
                 scale: 1.2,
                 child: Checkbox(
-                  value: med.isTaken,
+                  //check if the current date (at midnight) is in the completedDates list for this medication
+                  value: med.completedDates.any((d) => DateUtils.isSameDay(d, selectedDate)),
                   activeColor: AppColors.primaryBlue,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                   onChanged: (bool? value) {
                     setState(() {
-                      med.isTaken = value!;
+                      if (value == true) {
+                        med.completedDates.add(selectedDate);
+                      } else {
+                        med.completedDates.removeWhere((d) => DateUtils.isSameDay(d, selectedDate));
+                      }
                     });
                   },
                 ),
