@@ -32,7 +32,7 @@ class ScheduleScreen extends StatelessWidget {
     for (var med in meds) {
       // Because our model currently doesn't have a DateTime, we use 'today'
       // In the future, replace this with med.startDate
-      String monthKey = DateFormat('MMMM yyyy').format(DateTime.now());
+      String monthKey = DateFormat('MMMM yyyy').format(med.endDate);
       if (groups[monthKey] == null) groups[monthKey] = [];
       groups[monthKey]!.add(med);
     }
@@ -50,7 +50,7 @@ class ScheduleScreen extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dynamic month header based on the medication's start date (currently mocked as 'today')
+            // Dynamic month header based on the medication's end date
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
               child: Text(
