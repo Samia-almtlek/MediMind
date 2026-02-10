@@ -71,6 +71,9 @@ class ScheduleScreen extends StatelessWidget {
   }
 
   Widget _buildTreatmentCard(Medication med) {
+    // Check if the current date is before the end date
+    final bool isActive = med.endDate.isAfter(DateTime.now());
+
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       padding: EdgeInsets.all(16),
@@ -119,7 +122,7 @@ class ScheduleScreen extends StatelessWidget {
               ],
             ),
           ),
-          _buildStatusBadge(true), // Dynamic status based on medication data
+          _buildStatusBadge(isActive),
         ],
       ),
     );
