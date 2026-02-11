@@ -1,5 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
@@ -14,10 +15,9 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController notesController = TextEditingController();
 
   List<String> suggestions = [];
-  bool isLoading = false;
 
-  /// 🔍 Search drugs from Firestore for autocomplete
-  Future<void> searchDrugs(String query) async {
+  /// 🔍 Autocomplete search from LOCAL Hive DB
+  void searchDrugs(String query) {
     if (query.isEmpty) {
       setState(() {
         suggestions = [];
@@ -25,22 +25,16 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    final box = Hive.box<String>('drugs');
+    final normalizedQuery = query.toLowerCase().trim();
 
-    final snapshot =
-        await FirebaseFirestore.instance.collection('drugs').get();
-
-    final results = snapshot.docs
-        .map((doc) => doc['name'] as String)
-        .where((name) =>
-            name.toLowerCase().startsWith(query.toLowerCase()))
+    final results = box.values
+        .where((name) => name.startsWith(normalizedQuery))
+        .take(10)
         .toList();
 
     setState(() {
       suggestions = results;
-      isLoading = false;
     });
   }
 
@@ -48,11 +42,14 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Manual Input", style: TextStyle(color: Colors.black)),
+        title: const Text(
+          "Manual Input",
+          style: TextStyle(color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -62,24 +59,16 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ---------------- Medication Name ----------------
-            Text(
+            const Text(
               "Medication Name",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             TextField(
               controller: nameController,
-              decoration: InputDecoration(hintText: "e.g., Paracetamol"),
-              onChanged: (value) {
-                searchDrugs(value);
-              },
+              decoration:
+                  const InputDecoration(hintText: "e.g., Paracetamol"),
+              onChanged: searchDrugs,
             ),
-
-            // 🔄 Loading indicator
-            if (isLoading)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
 
             // 📋 Autocomplete suggestions
             ListView.builder(
@@ -98,36 +87,44 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
               },
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // ---------------- Dosage ----------------
-            Text("Dosage", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              "Dosage",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             TextField(
               controller: dosageController,
-              decoration: InputDecoration(hintText: "e.g., 500 mg"),
+              decoration:
+                  const InputDecoration(hintText: "e.g., 500 mg"),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             // ---------------- Notes ----------------
-            Text("Notes (Optional)",
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              "Notes (Optional)",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             TextField(
               controller: notesController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: "e.g., Take with food, avoid alcohol...",
+                hintText:
+                    "e.g., Take with food, avoid alcohol...",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.primaryBlue),
+                  borderSide:
+                      const BorderSide(color: AppColors.primaryBlue),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
 
-            Spacer(),
+            const Spacer(),
 
             // ---------------- Next Button ----------------
             SSurfaceButton(
@@ -148,9 +145,10 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content:
-                            Text("Please enter a medication name")),
+                    const SnackBar(
+                      content:
+                          Text("Please enter a medication name"),
+                    ),
                   );
                 }
               },
@@ -167,7 +165,10 @@ class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
 
-  SSurfaceButton({required this.text, required this.onPressed});
+  const SSurfaceButton({
+    required this.text,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,8 +183,8 @@ class SSurfaceButton extends StatelessWidget {
           ),
         ),
         onPressed: onPressed,
-        child: Text(
-          text,
+        child: const Text(
+          'Next',
           style: TextStyle(color: Colors.white, fontSize: 16),
         ),
       ),
