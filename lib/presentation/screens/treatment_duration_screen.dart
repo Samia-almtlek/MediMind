@@ -119,6 +119,12 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 ),
               ),
               onPressed: () {
+                int totalDays = selectedDuration == "Custom"
+                    ? customDays
+                    : int.parse(selectedDuration.split(' ')[0]);
+
+                DateTime calculatedEndDate = DateTime.now().add(Duration(days: totalDays -1)); //to avoid off-by-one error where the end date is actually the first day after the treatment ends
+
                 // Create a medication entry for each selected time
                 for (var time in selectedTimes) {
                   userAddedMeds.add(
@@ -126,7 +132,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                       name: widget.medicationName,
                       dosage: widget.dosage,
                       time: time.format(context),
-                      isTaken: false,
+                      endDate: calculatedEndDate,
+                      completedDates: [],
                     ),
                   );
                 }
@@ -134,8 +141,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                        SuccessScreen(medicationName: widget.medicationName),
+                    builder: (context) => SuccessScreen(medicationName: widget.medicationName),
                   ),
                 );
               },

@@ -41,7 +41,9 @@ class _MainScreenState extends State<MainScreen> {
   Navigator.push(
     context, 
     MaterialPageRoute(builder: (context) => AddChoiceScreen())
-  );
+  ) .then ((_) {
+    setState(() {}); // Refresh the state when returning from AddChoiceScreen
+  });
 },
       ) : null,
       bottomNavigationBar: BottomNavigationBar(

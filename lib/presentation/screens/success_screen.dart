@@ -42,7 +42,7 @@ class SuccessScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               SizedBox(height: 50),
-              // Knop om terug naar huis te gaan
+        
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -54,7 +54,7 @@ class SuccessScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    // Dit wist alle schermen in de 'stack' en gaat terug naar de eerste pagina (Home)
+                    // this clears all screens in the 'stack' and goes back to the home page
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                   child: Text(

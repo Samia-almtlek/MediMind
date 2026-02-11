@@ -10,12 +10,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  /* Sample medication data
-  final List<Medication> dailyMeds = [
-    Medication(name: "Paracetamol", dosage: "500 mg", time: "08:00 AM"),
-    Medication(name: "Insulin Glargine", dosage: "Target dose", time: "09:30 AM", isTaken: true),
-    Medication(name: "Vitamin D", dosage: "2000 IU", time: "12:00 PM"),
-  ];*/
+  
+  
 
   DateTime selectedDate = DateTime.now(); // day the user is viewing
   DateTime today = DateTime.now();
@@ -60,10 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
   // For now: Returns empty list to show "No medication" view
   List<Medication> _getListForSelectedDate() {
-    if(DateUtils.isSameDay(selectedDate, today)){
-      return userAddedMeds;
-    }
-    return [];
+    return userAddedMeds.where((med) {
+      DateTime start = DateTime(today.year, today.month, today.day);
+      DateTime end = DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+      DateTime current = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+
+      // Show medication when selected date is within start and end date.
+      return !current.isBefore(start) && !current.isAfter(end);
+    }).toList();
   }
 
   /// Adds a new medication to the active medications list
@@ -75,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
@@ -249,12 +250,17 @@ class _HomeScreenState extends State<HomeScreen> {
               Transform.scale(
                 scale: 1.2,
                 child: Checkbox(
-                  value: med.isTaken,
+                  //check if the current date (at midnight) is in the completedDates list for this medication
+                  value: med.completedDates.any((d) => DateUtils.isSameDay(d, selectedDate)),
                   activeColor: AppColors.primaryBlue,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                   onChanged: (bool? value) {
                     setState(() {
-                      med.isTaken = value!;
+                      if (value == true) {
+                        med.completedDates.add(selectedDate);
+                      } else {
+                        med.completedDates.removeWhere((d) => DateUtils.isSameDay(d, selectedDate));
+                      }
                     });
                   },
                 ),
@@ -265,4 +271,11 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+
+  @override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  // Dit zorgt ervoor dat telkens wanneer we terugkomen op dit scherm (bijvoorbeeld na Navigator.pop of switch in navbar), de UI ververst.
+  setState(() {}); 
+}
 }
