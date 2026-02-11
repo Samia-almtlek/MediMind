@@ -3,7 +3,9 @@ import 'home_screens.dart';
 import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
 import 'package:medimind/data/local_db/drug_loader.dart';
-
+import 'schedule_screen.dart';
+import 'chat_screen.dart';
+import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -17,9 +19,9 @@ class _MainScreenState extends State<MainScreen> {
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
     HomeScreen(), 
-    Center(child: Text("Schedule Page")), 
-    Center(child: Text("Chat Page")), 
-    Center(child: Text("Profile Page")),
+    ScheduleScreen(), 
+    ChatScreen(),
+    ProfileScreen(),
   ];
 @override
 void initState() {
@@ -46,10 +48,14 @@ void initState() {
         backgroundColor: AppColors.primaryBlue,
         child: Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
+
   Navigator.push(
     context, 
-    MaterialPageRoute(builder: (context) => AddChoiceScreen()),
-  );
+    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+  ) .then ((_) {
+    setState(() {}); // Refresh the state when returning from AddChoiceScreen
+  });
+
 },
       ) : null,
       bottomNavigationBar: BottomNavigationBar(

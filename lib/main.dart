@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'auth/presentation/auth_gate.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'firebase_options.dart';
-import 'presentation/screens/main_screen.dart';
+import 'auth/presentation/screens/register_screen.dart';
+
+/// Entry point for the app
 
 Future<void> main() async {
   /// Ensures that Flutter bindings are initialized
@@ -25,8 +28,8 @@ Future<void> main() async {
   /// We only store Strings (drug names) for autocomplete.
   await Hive.openBox<String>('drugs');
   print('🗄️ Hive initialized successfully');
-
-  /// Start the Flutter application
+  
+  // Start the Flutter application
   runApp(const MediMindApp());
 }
 
@@ -39,9 +42,12 @@ class MediMindApp extends StatelessWidget {
     return MaterialApp(
       /// Hide the debug banner
       debugShowCheckedModeBanner: false,
-
-      /// Entry screen of the app
-      home: MainScreen(),
+  // Set SplashScreen as the initial screen
+  home:  AuthGate(),
+   routes: {
+        '/signup': (context) => const RegisterScreen(),
+      },
+      
     );
   }
 }

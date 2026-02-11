@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:medimind/utils/global_data.dart';
 import '../../utils/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'success_screen.dart';
+import '../../domain/models/medication.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
@@ -117,6 +119,25 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 ),
               ),
               onPressed: () {
+                int totalDays = selectedDuration == "Custom"
+                    ? customDays
+                    : int.parse(selectedDuration.split(' ')[0]);
+
+                DateTime calculatedEndDate = DateTime.now().add(Duration(days: totalDays -1)); //to avoid off-by-one error where the end date is actually the first day after the treatment ends
+
+                // Create a medication entry for each selected time
+                for (var time in selectedTimes) {
+                  userAddedMeds.add(
+                    Medication(
+                      name: widget.medicationName,
+                      dosage: widget.dosage,
+                      time: time.format(context),
+                      endDate: calculatedEndDate,
+                      completedDates: [],
+                    ),
+                  );
+                }
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(
