@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -37,8 +37,8 @@ class ProfileScreen extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.logout, color: Colors.red),
               title: Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-              onTap: () {
-                // Logic for logout
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
               },
             ),
           ],
