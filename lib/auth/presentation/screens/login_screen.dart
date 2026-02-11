@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../utils/app_colors.dart';
 import '../../service/auth_service.dart';
@@ -22,22 +23,89 @@ class _LoginScreenState extends State<LoginScreen> {
 // Controls password visibility
 bool _isPasswordVisible = false;
 
-  Future<void> _login() async {
-    setState(() => _isLoading = true);
+ Future<void> _login() async {
+  setState(() => _isLoading = true);
 
-    try {
-      await _authService.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
+  try {
+    final credential = await _authService.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
 
-    setState(() => _isLoading = false);
+    // 🔥 Reload user to refresh verification status
+    await credential.user!.reload();
+    final refreshedUser = FirebaseAuth.instance.currentUser;
+
+    if (refreshedUser != null && !refreshedUser.emailVerified) {
+
+
+
+  if (!mounted) return;
+  setState(() => _isLoading = false);
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Email Not Verified"),
+      content: const Text(
+        "Please verify your email before logging in.",
+      ),
+      actions: [
+    TextButton(
+  onPressed: () async {
+    Navigator.pop(context); //  Close dialog immediately
+
+    await _authService.resendVerificationEmail();
+    await _authService.signOut();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Verification email resent."),
+        backgroundColor: Colors.green,
+      ),
+    );
+  },
+  child: const Text("Resend Email"),
+),
+
+        
+        TextButton(
+          
+            onPressed: () async {
+      await _authService.signOut();
+
+      if (!mounted) return;
+
+      Navigator.pop(context);
+    },
+          child: const Text("OK"),
+          
+        ),
+        
+      ],
+    ),
+    
+  );
+
+  return;
+}
+
+
+    // If verified → do nothing.
+    // AuthGate will automatically redirect to MainScreen.
+
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString())),
+    );
   }
+
+ if (!mounted) return;
+setState(() => _isLoading = false);
+
+}
 
   @override
   Widget build(BuildContext context) {
@@ -125,9 +193,15 @@ bool _isPasswordVisible = false;
 
               // Create Account
               TextButton(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/signup');
-                },
+                onPressed: () async {
+  final result = await Navigator.pushNamed(context, '/signup');
+
+  if (result != null && result is Map) {
+    _emailController.text = result["email"] ?? "";
+    _passwordController.text = result["password"] ?? "";
+  }
+},
+
                 child: Text(
                   "Create an account",
                   style: TextStyle(

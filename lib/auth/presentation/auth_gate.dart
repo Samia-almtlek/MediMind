@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:medimind/presentation/screens/main_screen.dart';
 
 import '../service/auth_service.dart';
-import '../../presentation/screens/main_screen.dart';
+import '../presentation/screens/register_screen.dart';
 import '../presentation/screens/login_screen.dart';
 
 /// AuthGate decides which screen to show
@@ -25,21 +26,24 @@ class AuthGate extends StatelessWidget {
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
         // While Firebase checks auth state
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
+    if (snapshot.connectionState == ConnectionState.waiting) {
+  return const Scaffold(
+    body: Center(child: CircularProgressIndicator()),
+  );
+}
 
-        // If user is logged in
-        if (snapshot.hasData) {
-          return MainScreen();
-        }
+if (snapshot.hasData) {
+  final user = snapshot.data!;
 
-        // If user is NOT logged in
-        return LoginScreen();
+  if (user.emailVerified) {
+    return MainScreen();
+  } else {
+    return LoginScreen();
+  }
+}
+
+return LoginScreen();
+
       },
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'auth/presentation/auth_gate.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'auth/presentation/screens/register_screen.dart';
 
 /// Entry point for the app
 
@@ -31,6 +32,11 @@ class MediMindApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
   // Set SplashScreen as the initial screen
   home:  AuthGate(),
+
+   routes: {
+        '/signup': (context) => const RegisterScreen(),
+      },
+      
     );
   }
 }
