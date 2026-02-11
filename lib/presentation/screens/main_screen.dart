@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'home_screens.dart';
 import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
+import 'package:medimind/data/local_db/drug_loader.dart';
+
 
 class MainScreen extends StatefulWidget {
   @override
@@ -19,6 +21,15 @@ class _MainScreenState extends State<MainScreen> {
     Center(child: Text("Chat Page")), 
     Center(child: Text("Profile Page")),
   ];
+@override
+void initState() {
+  super.initState();
+
+ 
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    DrugLoader.loadDrugsIfNeeded();
+  });
+}
 
   void _onItemTapped(int index) {
     setState(() {
@@ -37,7 +48,7 @@ class _MainScreenState extends State<MainScreen> {
         onPressed: () {
   Navigator.push(
     context, 
-    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+    MaterialPageRoute(builder: (context) => AddChoiceScreen()),
   );
 },
       ) : null,
