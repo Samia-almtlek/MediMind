@@ -29,6 +29,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return hasMinLength && hasUppercase && hasNumber;
   }
 
+bool _isValidEmail(String email) {
+  return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+}
+
   Future<void> _register() async {
     // 1️ Check password match
     if (_passwordController.text.trim() !=
@@ -38,6 +42,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
+
+if (!_isValidEmail(_emailController.text.trim())) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Please enter a valid email address."),
+    ),
+  );
+  return;
+}
+
 
     // 2️ Check password strength
     if (!_isPasswordStrong(_passwordController.text.trim())) {

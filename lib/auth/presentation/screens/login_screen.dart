@@ -22,8 +22,21 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 // Controls password visibility
 bool _isPasswordVisible = false;
+bool _isValidEmail(String email) {
+  return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email);
+}
+
 
  Future<void> _login() async {
+  if (!_isValidEmail(_emailController.text.trim())) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Please enter a valid email address."),
+    ),
+  );
+  return;
+}
+
   setState(() => _isLoading = true);
 
   try {
@@ -107,6 +120,64 @@ setState(() => _isLoading = false);
 
 }
 
+void _showForgotPasswordDialog() {
+  final TextEditingController resetController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Reset Password"),
+      content: TextField(
+        controller: resetController,
+        keyboardType: TextInputType.emailAddress,
+        decoration: const InputDecoration(
+          hintText: "Enter your email",
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () async {
+            final email = resetController.text.trim();
+
+            if (!_isValidEmail(email)) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Please enter a valid email address."),
+    ),
+  );
+  return;
+}
+
+
+            Navigator.pop(context);
+
+           if (!mounted) return;
+
+try {
+  await _authService.sendPasswordResetEmail(email);
+} catch (_) {}
+
+ScaffoldMessenger.of(this.context).showSnackBar(
+  const SnackBar(
+    content: Text(
+      "If this email is registered, you will receive a password reset link.",
+    ),
+    backgroundColor: Colors.green,
+  ),
+);
+
+          },
+          child: const Text("Send"),
+        ),
+      ],
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -162,6 +233,18 @@ setState(() => _isLoading = false);
                 controller: _passwordController,
                 isPassword: true,
               ),
+const SizedBox(height: 10),
+
+Align(
+  alignment: Alignment.centerRight,
+  child: TextButton(
+    onPressed: _showForgotPasswordDialog,
+    child: const Text(
+      "Forgot Password?",
+      style: TextStyle(fontSize: 13),
+    ),
+  ),
+),
 
               const SizedBox(height: 40),
 
@@ -195,8 +278,7 @@ setState(() => _isLoading = false);
               TextButton(
                 onPressed: () async {
   final result = await Navigator.pushNamed(context, '/signup');
-
-  if (result != null && result is Map) {
+if (result != null && result is Map) {
     _emailController.text = result["email"] ?? "";
     _passwordController.text = result["password"] ?? "";
   }
