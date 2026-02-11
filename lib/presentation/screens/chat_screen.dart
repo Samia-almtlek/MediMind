@@ -8,32 +8,55 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-
-  // Toggle between 'Quick' and 'Detailed' AI models
+  final ScrollController _scrollController = ScrollController();
+  // Toggle between 'Quick' and 'Detailed' models
   bool _isDetailedMode = false;
 
   // Mock list of messages for the demo
   final List<Map<String, dynamic>> _messages = [
     {
       "text": "Hello! I am your MediMind assistant. How can I help you today?",
-      "isUser": false
+      "isUser": false,
+      "time": DateTime.now(),
     },
   ];
 
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+  
   void _handleSendMessage() {
     if (_controller.text.isEmpty) return;
+    final userText= _controller.text;
 
     setState(() {
       // Add user message
-      _messages.add({"text": _controller.text, "isUser": true});
-
-      // Simulate AI response based on selected model
-      String response = _isDetailedMode
-          ? "Analysis: Based on medical guidelines, this medication interacts with..."
-          : "Yes, you can take this with water.";
-
-      _messages.add({"text": response, "isUser": false});
+      _messages.add({"text": userText, "isUser": true, "time": DateTime.now()});
       _controller.clear();
+    });
+    _scrollToBottom();
+
+    // Simulate AI response after a short delay
+    Future.delayed(Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          // Simulate AI response based on selected model
+          String response = _isDetailedMode
+              ? "Detailed Analysis: Research suggests that ${userText.toLowerCase().contains('aspirin') ? 'Aspirin' : 'this medication'} can have interactions with blood thinners. Always consult your doctor for a clinical diagnosis."
+              : "Quick Check: Generally safe, but take it after a meal to avoid stomach upset.";
+
+          _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
+        });
+        _scrollToBottom();
+      }
     });
   }
 
@@ -41,39 +64,28 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "MediMind AI",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("MediMind Assistant", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),),
+            Text("Always online", style: TextStyle(color: Colors.green, fontSize: 12)),
+          ],
         ),
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0.5,
         actions: [
-          // Switch for the two models mentioned in Sprint 2
-          Row(
-            children: [
-              Text(
-                _isDetailedMode ? "Detailed" : "Quick",
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-              Switch(
-                value: _isDetailedMode,
-                activeColor: AppColors.primaryBlue,
-                onChanged: (val) => setState(() => _isDetailedMode = val),
-              ),
-            ],
-          )
+          // Switch for the two models
+          _buildToggleSwitch(),
         ],
       ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
-              padding: EdgeInsets.all(16),
+              controller: _scrollController,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                return _buildChatBubble(msg["text"], msg["isUser"]);
-              },
+              itemBuilder: (context, index) => _buildChatBubble(_messages[index]),
             ),
           ),
           _buildInputArea(),
@@ -81,25 +93,55 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+  Widget _buildToggleSwitch() {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.bolt, size:16, color: _isDetailedMode ? Colors.grey : Colors.amber),
+          Switch(
+            value: _isDetailedMode,
+            activeColor: AppColors.primaryBlue,
+            onChanged: (value) => setState(()=>_isDetailedMode = value),
+            ),
+          Icon(Icons.biotech, size: 16, color: _isDetailedMode ? AppColors.primaryBlue : Colors.grey),
+        ],
+      ),
+    );
+  }
 
-  Widget _buildChatBubble(String text, bool isUser) {
+  Widget _buildChatBubble(Map<String, dynamic> msg) {
+    bool isUser = msg["isUser"];
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 5),
-        padding: EdgeInsets.all(12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        margin: EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primaryBlue : Colors.grey[200],
+          color: isUser ? AppColors.primaryBlue : Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(15),
-            topRight: Radius.circular(15),
-            bottomLeft: isUser ? Radius.circular(15) : Radius.circular(0),
-            bottomRight: isUser ? Radius.circular(0) : Radius.circular(15),
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: isUser ? Radius.circular(20) : Radius.circular(0),
+            bottomRight: isUser ? Radius.circular(0) : Radius.circular(20),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: Offset(0, 2)
+            ),
+          ],
         ),
         child: Text(
-          text,
-          style: TextStyle(color: isUser ? Colors.white : Colors.black87),
+          msg["text"],
+          style: TextStyle(color: isUser ? Colors.white : Colors.black87, fontSize: 16, height: 1.4),
         ),
       ),
     );
@@ -107,10 +149,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInputArea() {
     return Container(
-      padding: EdgeInsets.all(10),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 30),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
       ),
       child: Row(
         children: [
@@ -119,24 +161,26 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _controller,
               decoration: InputDecoration(
                 hintText: "Ask about your meds...",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  borderSide: BorderSide.none,
-                ),
                 filled: true,
                 fillColor: Colors.grey[100],
-                contentPadding: EdgeInsets.symmetric(horizontal: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
+              onSubmitted: (_) => _handleSendMessage(),
             ),
           ),
-          SizedBox(width: 8),
-          CircleAvatar(
-            backgroundColor: AppColors.primaryBlue,
-            child: IconButton(
-              icon: Icon(Icons.send, color: Colors.white),
-              onPressed: _handleSendMessage,
+          SizedBox(width: 12),
+          GestureDetector(
+            onTap: _handleSendMessage,
+            child: CircleAvatar(
+              radius: 25,
+              backgroundColor: AppColors.primaryBlue,
+              child: Icon(Icons.send_rounded, color: Colors.white),
             ),
-          )
+          ),
         ],
       ),
     );
