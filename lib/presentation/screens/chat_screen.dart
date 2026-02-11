@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import 'dart:async';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -11,6 +12,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   // Toggle between 'Quick' and 'Detailed' models
   bool _isDetailedMode = false;
+  bool _isTyping = false; // To show typing indicator
 
   // Mock list of messages for the demo
   final List<Map<String, dynamic>> _messages = [
@@ -34,20 +36,22 @@ class _ChatScreenState extends State<ChatScreen> {
   }
   
   void _handleSendMessage() {
-    if (_controller.text.isEmpty) return;
+    if (_controller.text.trim().isEmpty) return;
     final userText= _controller.text;
 
     setState(() {
       // Add user message
       _messages.add({"text": userText, "isUser": true, "time": DateTime.now()});
       _controller.clear();
+      _isTyping = true;
     });
     _scrollToBottom();
 
     // Simulate AI response after a short delay
-    Future.delayed(Duration(milliseconds: 800), () {
+    Timer(Duration(milliseconds: 1500), () {
       if (mounted) {
         setState(() {
+          _isTyping = false;
           // Simulate AI response based on selected model
           String response = _isDetailedMode
               ? "Detailed Analysis: Research suggests that ${userText.toLowerCase().contains('aspirin') ? 'Aspirin' : 'this medication'} can have interactions with blood thinners. Always consult your doctor for a clinical diagnosis."
@@ -80,12 +84,19 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          _buildModeBanner(),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) => _buildChatBubble(_messages[index]),
+              itemCount: _messages.length + (_isTyping ? 1 : 0), // Add extra item for typing indicator
+              itemBuilder: (context, index) {
+                if (index == _messages.length) {
+                  return _buildTypingIndicator();
+                } else {
+                  return _buildChatBubble(_messages[index]);
+                }
+              },
             ),
           ),
           _buildInputArea(),
@@ -93,6 +104,35 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+
+  Widget _buildModeBanner() {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      color: _isDetailedMode ? AppColors.primaryBlue.withOpacity(0.1) : Colors.amber.withOpacity(0.1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _isDetailedMode ? Icons.biotech : Icons.bolt,
+            size: 14,
+            color: _isDetailedMode ? AppColors.primaryBlue : Colors.orange,
+          ),
+          SizedBox(width: 8),
+          Text(
+            _isDetailedMode ? "Detailed Mode: Extensive Medical Insights" : "Quick Mode: Fast & Direct Answers",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _isDetailedMode ? AppColors.primaryBlue : Colors.orange[800],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildToggleSwitch() {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -100,17 +140,53 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey[300]!),
       ),
       child: Row(
         children: [
-          Icon(Icons.bolt, size:16, color: _isDetailedMode ? Colors.grey : Colors.amber),
-          Switch(
-            value: _isDetailedMode,
-            activeColor: AppColors.primaryBlue,
-            onChanged: (value) => setState(()=>_isDetailedMode = value),
+          Text("Quick", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.normal : FontWeight.bold)),
+          SizedBox(width: 4),
+          Icon(Icons.bolt, size:14, color: _isDetailedMode ? Colors.grey : Colors.amber),
+          Transform.scale(
+            scale: 0.8,
+            child: Switch(
+              value: _isDetailedMode,
+              activeColor: AppColors.primaryBlue,
+              onChanged: (value) => setState(() => _isDetailedMode = value),
             ),
-          Icon(Icons.biotech, size: 16, color: _isDetailedMode ? AppColors.primaryBlue : Colors.grey),
+          ),
+          Icon(Icons.biotech, size: 14, color: _isDetailedMode ? AppColors.primaryBlue : Colors.grey),
+          SizedBox(width: 4),
+          Text("Detailed", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.bold : FontWeight.normal)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+            ),
+            SizedBox(width: 10),
+            Text("AI is generating response...", style: TextStyle(fontSize: 13, color: Colors.grey[600], fontStyle: FontStyle.italic)),
+
+          ],
+        ),
       ),
     );
   }
