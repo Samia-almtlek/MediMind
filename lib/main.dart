@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'presentation/screens/main_screen.dart';
+import 'auth/presentation/auth_gate.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -30,7 +30,7 @@ class MediMindApp extends StatelessWidget {
       // Hide debug banner
       debugShowCheckedModeBanner: false,
   // Set SplashScreen as the initial screen
-  home: SplashScreen(),
+  home:  AuthGate(),
     );
   }
 }
