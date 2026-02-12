@@ -32,17 +32,7 @@ class AddChoiceScreen extends StatelessWidget {
             ),
             SizedBox(height: 20),
             //  scanning option
-            _buildOptionCard(
-              context,
-              title: "Scan Prescription (OCR)",
-              subtitle:
-                  "Use your camera to scan details from a physical label.",
-              icon: Icons.document_scanner_outlined,
-              onTap: () {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text("OCR coming soon!")));
-              },
-            ),
+
             _buildOptionCard(
               context,
               title: "Scan barcode",
