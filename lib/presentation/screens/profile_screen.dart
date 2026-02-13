@@ -68,12 +68,13 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.health_and_safety_outlined, 
               title: "My Medications", 
               subtitle: "Track your active treatments",
-              onTap: () => Navigator.pushNamed(context, '/schedule'),
+              onTap: () => Navigator.pushNamed(context, '/medications'),
             ),
             _buildProfileItem(
               icon: Icons.medical_information_outlined, 
               title: "Medical ID", 
               subtitle: "Emergency contact & blood type",
+              onTap: () => Navigator.pushNamed(context, '/medical_id'),
             ),
 
             const SizedBox(height: 20),
@@ -94,6 +95,7 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.lock_outline_rounded, 
               title: "Privacy & Data", 
               subtitle: "GDPR & Security settings",
+              onTap: () => Navigator.pushNamed(context, '/privacy'),
             ),
 
             const SizedBox(height: 20),
@@ -104,6 +106,7 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.help_outline_rounded, 
               title: "Support", 
               subtitle: "FAQ & Contact us",
+              onTap: () => Navigator.pushNamed(context, '/support'),
             ),
             
             const Padding(
@@ -129,7 +132,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Helper voor sectie-titels
+  // Helper for section headers
   Widget _buildSectionHeader(String title) {
     return Container(
       width: double.infinity,
