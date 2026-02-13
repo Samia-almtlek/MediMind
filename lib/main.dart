@@ -53,6 +53,7 @@ class MediMindApp extends StatelessWidget {
         '/medications': (context) => const MedicationsScreen(),
         '/medical_id': (context) => const MedicalIdScreen(),
         '/support': (context) => const SupportScreen(),
+        '/privacy': (context) => const PrivacyScreen(),
       },
       
     );
