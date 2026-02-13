@@ -10,18 +10,16 @@ class AuthException implements Exception {
   String toString() => message;
 }
 
-/// Service responsible for handling all authentication logic.
-/// This class isolates Firebase from the UI layer.
 class AuthService {
-  // Create a single instance of FirebaseAuth
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Stream that listens to authentication state changes.
-  /// This allows the app to react automatically when a user logs in or out.
+  /// Listen to auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// Sign up using email & password
+  /// ==========================
+  /// SIGN UP
+  /// ==========================
   Future<UserCredential> signUp({
     required String email,
     required String password,
@@ -36,15 +34,16 @@ class AuthService {
       final user = credential.user;
 
       if (user != null) {
-        // ✅ Update display name in Firebase Auth
         await user.updateDisplayName(fullName);
 
-        // ✅ Save user in Firestore
         await _firestore.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'fullName': fullName,
           'email': email,
+          'profilePhotoUrl': '',
+          'notificationsEnabled': true,
           'createdAt': FieldValue.serverTimestamp(),
+          'lastLogin': FieldValue.serverTimestamp(),
         });
       }
 
@@ -53,51 +52,58 @@ class AuthService {
       switch (e.code) {
         case 'email-already-in-use':
           throw AuthException("An account already exists with this email.");
-
         case 'invalid-email':
           throw AuthException("Invalid email address.");
-
         case 'weak-password':
           throw AuthException("Password is too weak.");
-
         default:
           throw AuthException("Registration failed. Please try again.");
       }
     }
   }
 
-  /// Sign in using email & password
+  /// ==========================
+  /// SIGN IN
+  /// ==========================
   Future<UserCredential> signIn({
     required String email,
     required String password,
   }) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-  } on FirebaseAuthException catch (e) {
-  switch (e.code) {
-    case 'invalid-email':
-      throw AuthException("Invalid email address.");
 
-    case 'user-disabled':
-      throw AuthException("This account has been disabled.");
+      final user = credential.user;
 
-    case 'wrong-password':
-    case 'user-not-found':
-      throw AuthException("Invalid email or password.");
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'lastLogin': FieldValue.serverTimestamp(),
+        });
+      }
 
-    case 'too-many-requests':
-      throw AuthException("Too many attempts. Please try again later.");
-
-    default:
-      throw AuthException("Login failed. Please try again.");
+      return credential;
+    } on FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'invalid-email':
+          throw AuthException("Invalid email address.");
+        case 'user-disabled':
+          throw AuthException("This account has been disabled.");
+        case 'wrong-password':
+        case 'user-not-found':
+          throw AuthException("Invalid email or password.");
+        case 'too-many-requests':
+          throw AuthException("Too many attempts. Please try again later.");
+        default:
+          throw AuthException("Login failed. Please try again.");
+      }
+    }
   }
-}
 
-  }
-
+  /// ==========================
+  /// RESEND VERIFICATION
+  /// ==========================
   Future<void> resendVerificationEmail() async {
     final user = _auth.currentUser;
 
@@ -109,20 +115,26 @@ class AuthService {
     }
   }
 
-  /// Send password reset email
+  /// ==========================
+  /// PASSWORD RESET
+  /// ==========================
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (_) {
-      //  Do nothing to avoid revealing account existence
+      // Prevent revealing if account exists
     }
   }
 
-  /// Sign out current user
+  /// ==========================
+  /// SIGN OUT
+  /// ==========================
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  /// Get current logged-in user
+  /// ==========================
+  /// CURRENT USER
+  /// ==========================
   User? get currentUser => _auth.currentUser;
 }
