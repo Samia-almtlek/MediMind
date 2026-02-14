@@ -1,26 +1,170 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 
-class MedicationsScreen extends StatelessWidget {
+class MedicationsScreen extends StatefulWidget {
+  const MedicationsScreen({super.key});
+
+  @override
+  State<MedicationsScreen> createState() => _MedicationsScreenState();
+}
+
+class _MedicationsScreenState extends State<MedicationsScreen> {
+  // Dynamische lijst: begint leeg!
+  final List<Map<String, dynamic>> _myMedications = [];
+
+  // Controllers voor de input velden
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _dosageController = TextEditingController();
+  final TextEditingController _stockController = TextEditingController();
+  final TextEditingController _maxController = TextEditingController();
+
+  void _showAddMedicationSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 20, left: 20, right: 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 20),
+              const Text("Add Medication Stock", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildTextField(_nameController, "Medication Name", Icons.medication),
+              _buildTextField(_dosageController, "Dosage (e.g. 500mg)", Icons.monitor_weight_outlined),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField(_stockController, "Current Stock", Icons.inventory_2_outlined, isNumber: true)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _buildTextField(_maxController, "Total in Pack", Icons.format_list_numbered, isNumber: true)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _myMedications.add({
+                      "name": _nameController.text,
+                      "dosage": _dosageController.text,
+                      "currentStock": int.tryParse(_stockController.text) ?? 0,
+                      "maxStock": int.tryParse(_maxController.text) ?? 1,
+                    });
+                  });
+                  _nameController.clear(); _dosageController.clear();
+                  _stockController.clear(); _maxController.clear();
+                  Navigator.pop(context);
+                },
+                child: const Text("Add to Cabinet", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isNumber = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: TextField(
+        controller: controller,
+        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: AppColors.primaryBlue),
+          labelText: label,
+          filled: true,
+          fillColor: Colors.grey[50]?.withOpacity(0.5) ?? Colors.grey.withOpacity(0.1),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(title: Text("My Medications", style: TextStyle(color: Colors.black)), backgroundColor: Colors.white, elevation: 0.5, iconTheme: IconThemeData(color: Colors.black)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.medication_liquid, size: 80, color: AppColors.primaryBlue.withOpacity(0.3)),
-            SizedBox(height: 16),
-            Text("No medications added yet", style: TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text("My Cabinet", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20), onPressed: () => Navigator.pop(context)),
       ),
-      floatingActionButton: FloatingActionButton(
+      body: _myMedications.isEmpty
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: _myMedications.length,
+              itemBuilder: (context, index) => _buildMedicineCard(_myMedications[index]),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddMedicationSheet,
         backgroundColor: AppColors.primaryBlue,
-        child: Icon(Icons.add, color: Colors.white),
-        onPressed: () { /* Hier komt later de add-logica */ },
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text("Add Stock", style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text("Your cabinet is empty", style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          Text("Add your medication to track stock", style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicineCard(Map<String, dynamic> med) {
+    double progress = med['currentStock'] / med['maxStock'];
+    Color statusColor = progress < 0.2 ? Colors.redAccent : (progress < 0.5 ? Colors.orangeAccent : AppColors.primaryBlue);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.medication, color: statusColor)),
+              const SizedBox(width: 15),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(med['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(med['dosage'], style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              ])),
+              Text("${med['currentStock']}/${med['maxStock']}", style: TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
+            ],
+          ),
+          const SizedBox(height: 15),
+          ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.grey[100], valueColor: AlwaysStoppedAnimation<Color>(statusColor))),
+        ],
       ),
     );
   }
