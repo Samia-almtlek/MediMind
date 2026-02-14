@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../utils/app_colors.dart';
 
 class MedicationsScreen extends StatefulWidget {
@@ -19,11 +20,14 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
   final TextEditingController _maxController = TextEditingController();
 
   void _showAddMedicationSheet() {
+    String? errorMessage;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
           top: 20, left: 20, right: 20,
@@ -40,6 +44,23 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
               const SizedBox(height: 20),
               const Text("Add Medication Stock", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
+              if (errorMessage != null) 
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(errorMessage!, style: const TextStyle(color: Colors.redAccent, fontSize: 13))),
+                    ],
+                  ),
+                ),
               _buildTextField(_nameController, "Medication Name", Icons.medication),
               _buildTextField(_dosageController, "Dosage (e.g. 500mg)", Icons.monitor_weight_outlined),
               Row(
@@ -57,6 +78,26 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 onPressed: () {
+                  // Validation: check required fields
+                  if (_nameController.text.trim().isEmpty) {
+                    setModalState(() {
+                      errorMessage = "Medication name is required";
+                    });
+                    return;
+                  }
+                  if (_stockController.text.trim().isEmpty) {
+                    setModalState(() {
+                      errorMessage = "Current stock is required";
+                    });
+                    return;
+                  }
+                  if (_maxController.text.trim().isEmpty) {
+                    setModalState(() {
+                      errorMessage = "Total in pack is required";
+                    });
+                    return;
+                  }
+                  
                   setState(() {
                     _myMedications.add({
                       "name": _nameController.text,
@@ -76,6 +117,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -85,6 +127,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       child: TextField(
         controller: controller,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: AppColors.primaryBlue),
           labelText: label,
