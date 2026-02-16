@@ -1,34 +1,41 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class MedicalIdScreen extends StatelessWidget {
+  const MedicalIdScreen({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(title: Text("Medical ID", style: TextStyle(color: Colors.black)), backgroundColor: Colors.white, elevation: 0.5, iconTheme: IconThemeData(color: Colors.black)),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            _buildInfoCard("Blood Type", "A+ (Example)", Icons.bloodtype),
-            _buildInfoCard("Allergies", "Penicillin, Peanuts", Icons.warning_amber),
-            _buildInfoCard("Emergency Contact", "+32 489 00 00 00", Icons.phone),
-          ],
-        ),
-      ),
-    );
+  State<MedicalIdScreen> createState() => _MedicalIdScreenState();
+}
+
+class _MedicalIdScreenState extends State<MedicalIdScreen> {
+  late Box medicalBox;
+  bool isEditing = false;
+
+  // Controllers & State
+  String? selectedBloodType;
+  final TextEditingController _allergyController = TextEditingController();
+  List<String> allergies = [];
+  final TextEditingController _contactNameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+
+  final List<String> bloodTypes = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+
+  @override
+  void initState() {
+    super.initState();
+    medicalBox = Hive.box('medical_id_data'); // Zorg dat je deze opent in main.dart
+    _loadSavedData();
   }
 
-  Widget _buildInfoCard(String label, String value, IconData icon) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.redAccent),
-        title: Text(label, style: TextStyle(fontSize: 12, color: Colors.grey)),
-        subtitle: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-      ),
-    );
+  void _loadSavedData() {
+    setState(() {
+      selectedBloodType = medicalBox.get('bloodType');
+      allergies = List<String>.from(medicalBox.get('allergies', defaultValue: []));
+      _contactNameController.text = medicalBox.get('contactName', defaultValue: '');
+      _phoneController.text = medicalBox.get('phone', defaultValue: '');
+      _emailController.text = medicalBox.get('email', defaultValue: '');
+    });
   }
-}
