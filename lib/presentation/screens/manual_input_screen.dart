@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
@@ -12,15 +14,42 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController dosageController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
 
+  List<String> suggestions = [];
+
+  /// 🔍 Autocomplete search from LOCAL Hive DB
+  void searchDrugs(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        suggestions = [];
+      });
+      return;
+    }
+
+    final box = Hive.box<String>('drugs');
+    final normalizedQuery = query.toLowerCase().trim();
+
+    final results = box.values
+        .where((name) => name.startsWith(normalizedQuery))
+        .take(10)
+        .toList();
+
+    setState(() {
+      suggestions = results;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Manual Input", style: TextStyle(color: Colors.black)),
+        title: const Text(
+          "Manual Input",
+          style: TextStyle(color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -29,42 +58,77 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            // ---------------- Medication Name ----------------
+            const Text(
               "Medication Name",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             TextField(
               controller: nameController,
-              decoration: InputDecoration(hintText: "e.g., Paracetamol"),
+              decoration:
+                  const InputDecoration(hintText: "e.g., Paracetamol"),
+              onChanged: searchDrugs,
             ),
-            SizedBox(height: 20),
-            Text("Dosage", style: TextStyle(fontWeight: FontWeight.bold)),
+
+            // 📋 Autocomplete suggestions
+            ListView.builder(
+              shrinkWrap: true,
+              itemCount: suggestions.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(suggestions[index]),
+                  onTap: () {
+                    setState(() {
+                      nameController.text = suggestions[index];
+                      suggestions = [];
+                    });
+                  },
+                );
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // ---------------- Dosage ----------------
+            const Text(
+              "Dosage",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             TextField(
               controller: dosageController,
-              decoration: InputDecoration(hintText: "e.g., 500 mg"),
+              decoration:
+                  const InputDecoration(hintText: "e.g., 500 mg"),
             ),
-            SizedBox(height: 20),
-            //for additional notes or remarks about the medication
-            Text("Notes (Optional)", style: TextStyle(fontWeight: FontWeight.bold)),
-              TextField(
-                controller: notesController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: "e.g., Take with food, avoid alcohol...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: AppColors.primaryBlue),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+
+            const SizedBox(height: 20),
+
+            // ---------------- Notes ----------------
+            const Text(
+              "Notes (Optional)",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            TextField(
+              controller: notesController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText:
+                    "e.g., Take with food, avoid alcohol...",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide:
+                      const BorderSide(color: AppColors.primaryBlue),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
+            ),
 
-            Spacer(),
+            const Spacer(),
+
+            // ---------------- Next Button ----------------
             SSurfaceButton(
               text: "Next",
-              //to go to treatment duration page
               onPressed: () {
                 if (nameController.text.isNotEmpty) {
                   Navigator.push(
@@ -73,15 +137,18 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                       builder: (context) => TreatmentDurationScreen(
                         medicationName: nameController.text,
                         dosage: dosageController.text,
-                        notes: notesController.text.isNotEmpty ? notesController.text : null,
+                        notes: notesController.text.isNotEmpty
+                            ? notesController.text
+                            : null,
                       ),
                     ),
                   );
-  
                 } else {
-                  // Small check so they can't click 'Next' without a name
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Please enter a medication name")),
+                    const SnackBar(
+                      content:
+                          Text("Please enter a medication name"),
+                    ),
                   );
                 }
               },
@@ -93,11 +160,15 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   }
 }
 
-// A simple reusable button for the flow
+// ---------------- Reusable Button ----------------
 class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
-  SSurfaceButton({required this.text, required this.onPressed});
+
+  const SSurfaceButton({
+    required this.text,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +183,10 @@ class SSurfaceButton extends StatelessWidget {
           ),
         ),
         onPressed: onPressed,
-        child: Text(text, style: TextStyle(color: Colors.white, fontSize: 16)),
+        child: const Text(
+          'Next',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
       ),
     );
   }

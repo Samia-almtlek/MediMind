@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screens.dart';
 import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
+import 'package:medimind/data/local_db/drug_loader.dart';
 import 'schedule_screen.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
@@ -22,6 +23,15 @@ class _MainScreenState extends State<MainScreen> {
     ChatScreen(),
     ProfileScreen(),
   ];
+@override
+void initState() {
+  super.initState();
+
+ 
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    DrugLoader.loadDrugsIfNeeded();
+  });
+}
 
   void _onItemTapped(int index) {
     setState(() {
@@ -38,12 +48,14 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: AppColors.primaryBlue,
         child: Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
+
   Navigator.push(
     context, 
     MaterialPageRoute(builder: (context) => AddChoiceScreen())
   ) .then ((_) {
     setState(() {}); // Refresh the state when returning from AddChoiceScreen
   });
+
 },
       ) : null,
       bottomNavigationBar: BottomNavigationBar(
