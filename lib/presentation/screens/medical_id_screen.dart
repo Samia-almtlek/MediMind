@@ -41,7 +41,7 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
   }
 
   bool _isValidPhone(String phone) {
-    // Regex voor E.164 formaat (Internationaal)
+    // Regex voor E.164 format (Internationaal)
     return RegExp(r'^\+?[1-9]\d{1,14}$').hasMatch(phone);
   }
 
@@ -171,4 +171,61 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       ),
     );
   }
+  bool isPhoneVerified = false;
+bool isVerifying = false;
+final TextEditingController _otpController = TextEditingController();
+
+void _startVerification() {
+  if (!_isValidPhone(_phoneController.text)) return;
+
+  setState(() => isVerifying = true);
+  
+  // Simuleer het versturen van een code
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Verification code sent to emergency contact...")),
+  );
+
+  _showVerificationDialog();
+}
+
+void _showVerificationDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text("Verify Contact"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text("Enter the 4-digit code sent to the phone number."),
+          TextField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            decoration: const InputDecoration(hintText: "0000"),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () {
+            // We simuleren dat '1234' de juiste code is
+            if (_otpController.text == "1234") {
+              setState(() {
+                isPhoneVerified = true;
+                isVerifying = false;
+              });
+              Navigator.pop(context);
+              _saveData(); // Sla op als geverifieerd
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid Code!")));
+            }
+          },
+          child: const Text("Verify"),
+        ),
+      ],
+    ),
+  );
+}
 }
