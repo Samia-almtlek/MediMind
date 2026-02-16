@@ -63,3 +63,112 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
     setState(() => isEditing = false);
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
+      appBar: AppBar(
+        title: const Text("Medical ID", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: Icon(isEditing ? Icons.check : Icons.edit, color: AppColors.primaryBlue),
+            onPressed: isEditing ? _saveData : () => setState(() => isEditing = true),
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle("Core Information"),
+            _buildBloodTypeDropdown(),
+            const SizedBox(height: 20),
+            _sectionTitle("Allergies"),
+            _buildAllergyInput(),
+            const SizedBox(height: 20),
+            _sectionTitle("Emergency Contact"),
+            _buildContactFields(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBloodTypeDropdown() {
+    return DropdownButtonFormField<String>(
+      value: selectedBloodType,
+      decoration: _inputDecoration("Blood Type", Icons.bloodtype),
+      items: bloodTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+      onChanged: isEditing ? (val) => setState(() => selectedBloodType = val) : null,
+    );
+  }
+
+  Widget _buildAllergyInput() {
+    return Column(
+      children: [
+        if (isEditing)
+          TextField(
+            controller: _allergyController,
+            decoration: _inputDecoration("Add allergy and press enter", Icons.warning_amber).copyWith(
+              suffixIcon: IconButton(icon: const Icon(Icons.add), onPressed: () {
+                if (_allergyController.text.isNotEmpty) {
+                  setState(() {
+                    allergies.add(_allergyController.text);
+                    _allergyController.clear();
+                  });
+                }
+              }),
+            ),
+            onSubmitted: (val) {
+              if (val.isNotEmpty) setState(() { allergies.add(val); _allergyController.clear(); });
+            },
+          ),
+        Wrap(
+          spacing: 8,
+          children: allergies.map((a) => Chip(
+            label: Text(a),
+            onDeleted: isEditing ? () => setState(() => allergies.remove(a)) : null,
+            backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
+          )).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactFields() {
+    return Column(
+      children: [
+        _buildEditField(_contactNameController, "Contact Name", Icons.person_outline),
+        _buildEditField(_phoneController, "Phone (e.g. +32...)", Icons.phone, inputType: TextInputType.phone),
+        _buildEditField(_emailController, "Email", Icons.email_outlined, inputType: TextInputType.emailAddress),
+      ],
+    );
+  }
+
+  // Helpers
+  Widget _sectionTitle(String title) => Padding(
+    padding: const EdgeInsets.only(bottom: 10, left: 5),
+    child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+  );
+
+  InputDecoration _inputDecoration(String label, IconData icon) => InputDecoration(
+    labelText: label, prefixIcon: Icon(icon, color: AppColors.primaryBlue),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+    enabled: isEditing,
+  );
+
+  Widget _buildEditField(TextEditingController controller, String label, IconData icon, {TextInputType inputType = TextInputType.text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        keyboardType: inputType,
+        decoration: _inputDecoration(label, icon),
+        readOnly: !isEditing,
+      ),
+    );
+  }
+}
