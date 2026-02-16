@@ -6,6 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'firebase_options.dart';
 import 'auth/presentation/screens/register_screen.dart';
 
+import 'presentation/screens/testing_screen.dart';
+
 /// Entry point for the app
 
 Future<void> main() async {
@@ -46,6 +48,8 @@ class MediMindApp extends StatelessWidget {
   home:  AuthGate(),
    routes: {
         '/signup': (context) => const RegisterScreen(),
+        '/schedule': (context) => TestingScreen(),// const Scaffold(body: Center(child: Text("Schedule Screen"))),
+        '/medical-id-edit': (context) => TestingScreen(),// const Scaffold(body: Center(child: Text("Medical ID Edit"))),
       },
       
     );
