@@ -93,15 +93,31 @@ class PrivacyScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _buildPrivacyTile("Personal Data", "Manage your profile information", Icons.person_outline),
-          _buildPrivacyTile("Data Export", "Download your medical history", Icons.download_outlined),
-          _buildPrivacyTile("Delete Account", "Permanently remove your data", Icons.delete_outline, isDestructive: true),
+          _buildPrivacyTile(
+            "Personal Data", 
+            "Manage your profile information", 
+            Icons.person_outline,
+            onTap: () => Navigator.pushNamed(context, '/medical_id'), // Stuurt ze naar de edit pagina
+          ),
+          _buildPrivacyTile(
+            "Data Export", 
+            "Download your medical history", 
+            Icons.download_outlined,
+            onTap: () => _exportData(context),
+          ),
+          _buildPrivacyTile(
+            "Delete Account", 
+            "Permanently remove your data", 
+            Icons.delete_outline, 
+            isDestructive: true,
+            onTap: () => _showDeleteDialog(context),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPrivacyTile(String title, String sub, IconData icon, {bool isDestructive = false}) {
+  Widget _buildPrivacyTile(String title, String sub, IconData icon, {bool isDestructive = false, VoidCallback? onTap}) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: BorderSide(color: Colors.grey.shade200)),
@@ -111,6 +127,7 @@ class PrivacyScreen extends StatelessWidget {
         title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: isDestructive ? Colors.redAccent : Colors.black)),
         subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+        onTap: onTap,
       ),
     );
   }
