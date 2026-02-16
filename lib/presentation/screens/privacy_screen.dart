@@ -1,8 +1,50 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
+
+  Future<void> _deleteEverything(BuildContext context) async {
+    // delete all local data in Hive
+    await Hive.box<String>('drugs').clear();
+    await Hive.box('medical_id_data').clear();
+    await Hive.box<Map>('medication_stock').clear();
+
+    // delete Firebase account (this will also trigger AuthGate to redirect to login)
+    try {
+      await FirebaseAuth.instance.currentUser?.delete();
+      // AuthGate will automatically redirect to login screen after account deletion
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please re-login to delete your account.")),
+        );
+      }
+    }
+  }
+
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Account?"),
+        content: const Text("This action is permanent. All your medical records and stock data will be erased."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteEverything(context);
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
