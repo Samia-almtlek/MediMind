@@ -46,6 +46,37 @@ class PrivacyScreen extends StatelessWidget {
     );
   }
 
+  void _exportData(BuildContext context) {
+    final box = Hive.box('medical_id_data');
+    final bloodType = box.get('bloodType', defaultValue: 'Not set');
+    final allergies = box.get('allergies', defaultValue: []);
+
+    // Simulation of data export - in the real app, you'd generate a file or send an email
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.mark_email_read_outlined, size: 50, color: AppColors.primaryBlue),
+            const SizedBox(height: 15),
+            const Text("Exporting Data", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 10),
+            Text("A summary of your Medical ID ($bloodType, ${allergies.length} allergies) is being sent to your mailbox."),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
