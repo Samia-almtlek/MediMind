@@ -11,6 +11,8 @@ import 'presentation/screens/medical_id_screen.dart';
 import 'presentation/screens/support_screen.dart';
 import 'presentation/screens/privacy_screen.dart';
 import 'presentation/screens/profile_screen.dart';
+import 'presentation/screens/notification_settings_screen.dart';
+
 /// Entry point for the app
 
 Future<void> main() async {
@@ -71,6 +73,7 @@ class MediMindApp extends StatelessWidget {
         '/medical_id': (context) => MedicalIdScreen(),
         '/support': (context) => SupportScreen(),
         '/privacy': (context) => PrivacyScreen(),
+        '/notifications': (context) => const NotificationSettingsScreen(),
       },
       
     );
