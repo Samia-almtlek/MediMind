@@ -180,7 +180,7 @@ void _startVerification() {
 
   setState(() => isVerifying = true);
   
-  // Simuleer het versturen van een code
+  // Simulate sending OTP to the phone number (in real app, integrate with SMS API or Firebase Phone Auth)
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(content: Text("Verification code sent to emergency contact...")),
   );
@@ -210,14 +210,14 @@ void _showVerificationDialog() {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
         ElevatedButton(
           onPressed: () {
-            // We simuleren dat '1234' de juiste code is
+            // We simulate verification by accepting "1234" as the correct code for demo purposes
             if (_otpController.text == "1234") {
               setState(() {
                 isPhoneVerified = true;
                 isVerifying = false;
               });
               Navigator.pop(context);
-              _saveData(); // Sla op als geverifieerd
+              _saveData(); // Save the medical ID data after successful verification
             } else {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid Code!")));
             }
