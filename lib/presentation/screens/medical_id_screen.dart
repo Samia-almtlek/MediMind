@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../utils/app_colors.dart';
 
-class MedicalIdScreen extends StatelessWidget {
+class MedicalIdScreen extends StatefulWidget {
   const MedicalIdScreen({super.key});
 
   @override
@@ -23,6 +23,63 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
   final List<String> bloodTypes = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
 
+  bool isPhoneVerified = false;
+bool isVerifying = false;
+final TextEditingController _otpController = TextEditingController();
+
+void _startVerification() {
+  if (!_isValidPhone(_phoneController.text)) return;
+
+  setState(() => isVerifying = true);
+  
+  // Simuleer het versturen van een code
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Verification code sent to emergency contact...")),
+  );
+
+  _showVerificationDialog();
+}
+
+void _showVerificationDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text("Verify Contact"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text("Enter the 4-digit code sent to the phone number."),
+          TextField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            maxLength: 4,
+            decoration: const InputDecoration(hintText: "0000"),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(
+          onPressed: () {
+            // We simuleren dat '1234' de juiste code is
+            if (_otpController.text == "1234") {
+              setState(() {
+                isPhoneVerified = true;
+                isVerifying = false;
+              });
+              Navigator.pop(context);
+              _saveData(); // Sla op als geverifieerd
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid Code!")));
+            }
+          },
+          child: const Text("Verify"),
+        ),
+      ],
+    ),
+  );
+}
   @override
   void initState() {
     super.initState();
@@ -39,9 +96,8 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       _emailController.text = medicalBox.get('email', defaultValue: '');
     });
   }
-
   bool _isValidPhone(String phone) {
-    // Regex voor E.164 format (Internationaal)
+    // Regex voor E.164 formaat (Internationaal)
     return RegExp(r'^\+?[1-9]\d{1,14}$').hasMatch(phone);
   }
 
@@ -63,7 +119,6 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
     setState(() => isEditing = false);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,12 +195,26 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
   Widget _buildContactFields() {
     return Column(
-      children: [
-        _buildEditField(_contactNameController, "Contact Name", Icons.person_outline),
-        _buildEditField(_phoneController, "Phone (e.g. +32...)", Icons.phone, inputType: TextInputType.phone),
-        _buildEditField(_emailController, "Email", Icons.email_outlined, inputType: TextInputType.emailAddress),
-      ],
-    );
+    children: [
+      _buildEditField(_contactNameController, "Contact Name", Icons.person_outline),
+      Stack(
+        alignment: Alignment.centerRight,
+        children: [
+          _buildEditField(_phoneController, "Phone (e.g. +32...)", Icons.phone, inputType: TextInputType.phone),
+          if (isEditing)
+            Padding(
+              padding: const EdgeInsets.only(right: 10, bottom: 10),
+              child: TextButton(
+                onPressed: isPhoneVerified ? null : _startVerification,
+                child: Text(isPhoneVerified ? "Verified" : "Verify", 
+                  style: TextStyle(color: isPhoneVerified ? Colors.green : AppColors.primaryBlue)),
+              ),
+            ),
+        ],
+      ),
+      _buildEditField(_emailController, "Email", Icons.email_outlined, inputType: TextInputType.emailAddress),
+    ],
+  );
   }
 
   // Helpers
@@ -171,61 +240,4 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       ),
     );
   }
-  bool isPhoneVerified = false;
-bool isVerifying = false;
-final TextEditingController _otpController = TextEditingController();
-
-void _startVerification() {
-  if (!_isValidPhone(_phoneController.text)) return;
-
-  setState(() => isVerifying = true);
-  
-  // Simulate sending OTP to the phone number (in real app, integrate with SMS API or Firebase Phone Auth)
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text("Verification code sent to emergency contact...")),
-  );
-
-  _showVerificationDialog();
-}
-
-void _showVerificationDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      title: const Text("Verify Contact"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text("Enter the 4-digit code sent to the phone number."),
-          TextField(
-            controller: _otpController,
-            keyboardType: TextInputType.number,
-            maxLength: 4,
-            decoration: const InputDecoration(hintText: "0000"),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-        ElevatedButton(
-          onPressed: () {
-            // We simulate verification by accepting "1234" as the correct code for demo purposes
-            if (_otpController.text == "1234") {
-              setState(() {
-                isPhoneVerified = true;
-                isVerifying = false;
-              });
-              Navigator.pop(context);
-              _saveData(); // Save the medical ID data after successful verification
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Invalid Code!")));
-            }
-          },
-          child: const Text("Verify"),
-        ),
-      ],
-    ),
-  );
-}
 }
