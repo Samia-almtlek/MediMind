@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
+  @override
+  _ProfileScreenState createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _notificationsEnabled = true;// Placeholder for notification settings
+
   @override
   Widget build(BuildContext context) {
     // Take the logged in user from firebase auth 
@@ -11,7 +18,7 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Profile",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
@@ -85,10 +92,15 @@ class ProfileScreen extends StatelessWidget {
               icon: Icons.notifications_none_rounded, 
               title: "Notifications", 
               subtitle: "Reminders & Alerts",
+              onTap: () => Navigator.pushNamed(context, '/notifications'), // Navigate to the notification settings screen
               trailing: Switch(
-                value: true, 
+                value: _notificationsEnabled, 
                 activeColor: AppColors.primaryBlue, 
-                onChanged: (val) {},
+                onChanged: (val) {
+                  setState(() {
+                    _notificationsEnabled = val;
+                  });
+                },
               ),
             ),
             _buildProfileItem(
