@@ -39,3 +39,27 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
       _emailController.text = medicalBox.get('email', defaultValue: '');
     });
   }
+
+  bool _isValidPhone(String phone) {
+    // Regex voor E.164 formaat (Internationaal)
+    return RegExp(r'^\+?[1-9]\d{1,14}$').hasMatch(phone);
+  }
+
+  void _saveData() {
+    if (!_isValidPhone(_phoneController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid phone format. Use +32..."))
+      );
+      return;
+    }
+
+    medicalBox.putAll({
+      'bloodType': selectedBloodType,
+      'allergies': allergies,
+      'contactName': _contactNameController.text,
+      'phone': _phoneController.text,
+      'email': _emailController.text,
+    });
+
+    setState(() => isEditing = false);
+  }
