@@ -36,7 +36,23 @@ Future<void> main() async {
   
   // Start the Flutter application
   runApp(const MediMindApp());
+
+  // Search the main() function and add the box
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Hive.initFlutter();
+  
+  // existing box for drug names
+  await Hive.openBox<String>('drugs');
+  
+  // Add the following: the box for medical ID (we use a dynamic box for different types)
+  await Hive.openBox('medical_id_data'); 
+  // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
+  await Hive.openBox<Map>('medication_stock');
+
+  runApp(const MediMindApp());
 }
+  
 
 /// Root widget of the application
 class MediMindApp extends StatelessWidget {
