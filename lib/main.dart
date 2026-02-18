@@ -41,8 +41,6 @@ Future<void> main() async {
 
   // Search the main() function and add the box
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  await Hive.initFlutter();
   
   // existing box for drug names
   await Hive.openBox<String>('drugs');
