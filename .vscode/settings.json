@@ -1,4 +1,16 @@
 {
   "java.configuration.updateBuildConfiguration": "interactive",
-  "FSharp.suggestGitignore": false
+  "FSharp.suggestGitignore": false,
+  "cmake.ignoreCMakeListsMissing": true,
+
+  "java.jdt.ls.java.home": "${env:JAVA_HOME}",
+  "java.import.gradle.java.home": "${env:JAVA_HOME}",
+  "gradle.javaHome": "${env:JAVA_HOME}",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "${env:JAVA_HOME}",
+      "default": true
+    }
+  ]
 }
