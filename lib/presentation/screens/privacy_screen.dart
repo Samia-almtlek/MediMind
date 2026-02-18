@@ -62,20 +62,38 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showDeleteDialog(BuildContext context) {
+    final TextEditingController _passwordConfirmController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text("Delete Account?"),
-        content: const Text("This action is permanent. All your medical records and stock data will be erased."),
+        title: const Text("Confirm Deletion"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("To delete your account, please enter your password for security."),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _passwordConfirmController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: "Enter password",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
-              Navigator.pop(dialogContext);
-              _deleteEverything(context);
+              if (_passwordConfirmController.text.isNotEmpty) {
+                Navigator.pop(dialogContext);
+                _reauthenticateAndDelete(context, _passwordConfirmController.text);
+              }
             },
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            child: const Text("Delete Permanently", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
