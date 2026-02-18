@@ -197,6 +197,25 @@ if (!_isValidEmail(_emailController.text.trim())) {
                       ),
                     ),
 
+                    const SizedBox(height: 12),
+
+                    Center(
+                      child: TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                              },
+                        child: const Text(
+                          "Already have an account?",
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
                     const SizedBox(height: 20),
 
                     // Already have an account button
