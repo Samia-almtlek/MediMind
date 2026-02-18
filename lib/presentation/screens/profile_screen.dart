@@ -1,25 +1,33 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
   @override
-  _ProfileScreenState createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _notificationsEnabled = true;// Placeholder for notification settings
+  bool _notificationsEnabled = true; // Placeholder for notification settings
+
+  // Function to refresh user data after editing profile
+  void _refreshUser() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Take the logged in user from firebase auth 
+    // Take the logged in user from firebase auth
     final User? user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
         title: const Text(
-          "Profile",
+          "My Profile",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
@@ -30,7 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             const SizedBox(height: 30),
-            //profile header (we'll see later if we add a picture for the user or not )
+            //profile header
             Center(
               child: Column(
                 children: [
@@ -39,15 +47,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       CircleAvatar(
                         radius: 55,
                         backgroundColor: AppColors.lightTeal.withOpacity(0.5),
-                        child: Icon(Icons.person, size: 60, color: AppColors.primaryBlue),
+                        backgroundImage: user?.photoURL != null
+                            ? NetworkImage(user!.photoURL!)
+                            : null,
+                        child: user?.photoURL == null
+                            ? Icon(Icons.person,
+                                size: 60, color: AppColors.primaryBlue)
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,
                         right: 0,
-                        child: Container(
-                          padding: EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: Icon(Icons.camera_alt, size: 20, color: AppColors.iconGrey),
+                        child: GestureDetector(
+                          onTap: () async {
+                            // Navigates to the EditProfileScreen and waits for it to pop before refreshing user data
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                            );
+                            _refreshUser(); // Trigger rebuild to show updated profile picture
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                            child: Icon(Icons.camera_alt, size: 20, color: AppColors.iconGrey),
+                          ),
                         ),
                       ),
                     ],
@@ -66,20 +90,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 35),
+
+            // ACCOUNT SETTINGS section
+            _buildSectionHeader("Account Settings"),
+            _buildProfileItem(
+              icon: Icons.person_outline,
+              title: "Personal Data",
+              subtitle: "Update your personal information",
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                );
+                _refreshUser();
+              },
+            ),
+
+            const SizedBox(height: 20),
 
             // MANAGE HEALTH section
             _buildSectionHeader("Manage Health"),
             _buildProfileItem(
-              icon: Icons.health_and_safety_outlined, 
-              title: "My Medications", 
+              icon: Icons.health_and_safety_outlined,
+              title: "My Medications",
               subtitle: "Track your active treatments",
               onTap: () => Navigator.pushNamed(context, '/medications'),
             ),
             _buildProfileItem(
-              icon: Icons.medical_information_outlined, 
-              title: "Medical ID", 
+              icon: Icons.medical_information_outlined,
+              title: "Medical ID",
               subtitle: "Emergency contact & blood type",
               onTap: () => Navigator.pushNamed(context, '/medical_id'),
             ),
@@ -89,13 +130,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // PREFERENCES section
             _buildSectionHeader("Preferences"),
             _buildProfileItem(
-              icon: Icons.notifications_none_rounded, 
-              title: "Notifications", 
+              icon: Icons.notifications_none_rounded,
+              title: "Notifications",
               subtitle: "Reminders & Alerts",
-              onTap: () => Navigator.pushNamed(context, '/notifications'), // Navigate to the notification settings screen
+              onTap: () => Navigator.pushNamed(context,
+                  '/notifications'), // Navigate to the notification settings screen
               trailing: Switch(
-                value: _notificationsEnabled, 
-                activeColor: AppColors.primaryBlue, 
+                value: _notificationsEnabled,
+                activeColor: AppColors.primaryBlue,
                 onChanged: (val) {
                   setState(() {
                     _notificationsEnabled = val;
@@ -104,8 +146,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             _buildProfileItem(
-              icon: Icons.lock_outline_rounded, 
-              title: "Privacy & Data", 
+              icon: Icons.lock_outline_rounded,
+              title: "Privacy & Data",
               subtitle: "GDPR & Security settings",
               onTap: () => Navigator.pushNamed(context, '/privacy'),
             ),
@@ -115,22 +157,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // ACCOUNT section
             _buildSectionHeader("Account"),
             _buildProfileItem(
-              icon: Icons.help_outline_rounded, 
-              title: "Support", 
+              icon: Icons.help_outline_rounded,
+              title: "Support",
               subtitle: "FAQ & Contact us",
               onTap: () => Navigator.pushNamed(context, '/support'),
             ),
-            
+
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Divider(thickness: 0.5),
             ),
             ListTile(
-              contentPadding: EdgeInsets.symmetric(horizontal: 24),
-              leading: Icon(Icons.logout_rounded, color: Colors.redAccent),
-              title: Text(
-                "Logout", 
-                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+              title: const Text(
+                "Logout",
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold),
               ),
               onTap: () async {
                 await FirebaseAuth.instance.signOut();
@@ -148,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSectionHeader(String title) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
       child: Text(
         title,
         style: TextStyle(
@@ -161,27 +204,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Verbeterde Profile Item Widget
-  Widget _buildProfileItem({
-    required IconData icon, 
-    required String title, 
-    required String subtitle, 
-    Widget? trailing,
-    VoidCallback? onTap
-  }) {
+  // Improved Profile Item Widget
+  Widget _buildProfileItem(
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      Widget? trailing,
+      VoidCallback? onTap}) {
     return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
       leading: Container(
-        padding: EdgeInsets.all(10),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.primaryBlue.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(icon, color: AppColors.primaryBlue, size: 22),
       ),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-      trailing: trailing ?? Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
+      title: Text(title,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+      subtitle: Text(subtitle,
+          style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+      trailing: trailing ??
+          Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[400]),
       onTap: onTap ?? () {},
     );
   }
