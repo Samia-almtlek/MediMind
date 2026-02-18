@@ -3,6 +3,7 @@ import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
+import 'package:medimind/presentation/screens/edit_profile_screen.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -103,7 +104,7 @@ class PrivacyScreen extends StatelessWidget {
             "Personal Data", 
             "Manage your profile information", 
             Icons.person_outline,
-            onTap: () => Navigator.pushNamed(context, '/medical_id'), // Stuurt ze naar de edit pagina
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen())),
           ),
           _buildPrivacyTile(
             "Data Export", 
