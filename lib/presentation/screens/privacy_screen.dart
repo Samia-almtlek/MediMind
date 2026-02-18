@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' show EmailAuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
 import 'package:medimind/presentation/screens/edit_profile_screen.dart';
@@ -27,6 +28,34 @@ class PrivacyScreen extends StatelessWidget {
       if (e.code == 'requires-recent-login') {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Please re-login to delete your account.")),
+        );
+      }
+    }
+  }
+
+  Future<void> _reauthenticateAndDelete(BuildContext context, String password) async {
+    User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user != null && user.email != null) {
+      try {
+        // Maak een credential met het ingevoerde wachtwoord
+        AuthCredential credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+
+        // Re-authenticate de gebruiker
+        await user.reauthenticateWithCredential(credential);
+
+        // Als dit lukt, kunnen we nu ZONDER error alles verwijderen
+        await _deleteEverything(context);
+        
+      } on FirebaseAuthException catch (e) {
+        String errorMessage = "Wrong password. Please try again.";
+        if (e.code == 'wrong-password') errorMessage = "The password you entered is incorrect.";
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),
         );
       }
     }
