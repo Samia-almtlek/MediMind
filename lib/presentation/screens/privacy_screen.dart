@@ -155,7 +155,7 @@ class PrivacyScreen extends StatelessWidget {
               "🔐 Encryption & Security:\n"
               "• All your medical data is encrypted end-to-end\n"
               "• Your medication history, medical ID, and allergies are stored securely on your device first\n"
-              "• Data is synced to Firebase Firestore using encrypted connections (HTTPS/TLS)\n\n"
+              "• Data is synced to Firebase Firestore using encrypted connections \n\n"
               " Local & Cloud Storage:\n"
               "• Primary storage: Your personal device (via Hive database - completely private)\n"
               "• Cloud backup: Synced to Firebase for account recovery and cross-device access\n"
