@@ -31,28 +31,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _updateProfile() async {
     setState(() => _isLoading = true);
     try {
+      // 1. Update the photoURL if a new image was picked
       if (_imageFile != null) {
-        // TODO: Upload to Firebase Storage and set the photo URL.
-        // await user?.updatePhotoURL(uploadedImageUrl);
+        // for the actual app the image should be uploaded in Firebase Storage and the returned URL should be saved in FirebaseAuth. But for now we save the local path so the app knows which file to load.
+        await user?.updatePhotoURL(_imageFile!.path);
       }
 
-      // Update user info
+      // 2. Update Display Name
       if (_nameController.text != user?.displayName) {
         await user?.updateDisplayName(_nameController.text);
       }
 
-    
-      if (_emailController.text != user?.email) {
-        await user?.verifyBeforeUpdateEmail(_emailController.text);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Verification email sent to new address.")),
-        );
-      }
+      // 3. Forces a reload of the user to ensure the latest data is fetched from Firebase
+      await user?.reload();
 
-      if (_passwordController.text.isNotEmpty) {
-        await user?.updatePassword(_passwordController.text);
-      }
-
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile updated successfully!")),
       );
@@ -62,7 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (e.code == 'requires-recent-login') message = "Please re-login to change sensitive data.";
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
