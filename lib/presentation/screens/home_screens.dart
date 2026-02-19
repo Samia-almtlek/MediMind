@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -10,9 +11,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  
-  
-
   DateTime selectedDate = DateTime.now(); // day the user is viewing
   DateTime today = DateTime.now();
   //dit is nu een lege lijst om later te vullen via de API of db
@@ -47,23 +45,63 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadInitialData() {
-    // (straks komt dit uit Firestore)
-    setState(() {
-      activeMeds = [];
+    FirebaseFirestore.instance
+        .collection('user_medications')
+        .snapshots()
+        .listen((snapshot) {
+      for (var doc in snapshot.docs) {
+        print(
+            "Firestore Data: ${doc.data()}"); // Check your debug console for this!
+      }
+      setState(() {
+        userAddedMeds =
+            snapshot.docs.map((doc) => Medication.fromFirestore(doc)).toList();
+      });
     });
   }
 
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
   // For now: Returns empty list to show "No medication" view
   List<Medication> _getListForSelectedDate() {
-    return userAddedMeds.where((med) {
-      DateTime start = DateTime(today.year, today.month, today.day);
-      DateTime end = DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
-      DateTime current = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    List<Medication> filteredMeds = [];
 
-      // Show medication when selected date is within start and end date.
-      return !current.isBefore(start) && !current.isAfter(end);
-    }).toList();
+    for (var med in userAddedMeds) {
+      // 1. Date Check
+      DateTime start =
+          DateTime(med.startDate.year, med.startDate.month, med.startDate.day);
+      DateTime end =
+          DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+      DateTime current =
+          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+
+      if (!current.isBefore(start) && !current.isAfter(end)) {
+        // 2. Split the instructions string into individual times
+        // Extracts "8:00 AM, 4:00 PM, 12:00 AM" from "Times: 8:00 AM... Notes:"
+        String timePart = med.instructions
+            .split("Notes:")[0]
+            .replaceAll("Times: ", "")
+            .trim();
+        List<String> allTimes = timePart.split(", ");
+
+        for (String individualTime in allTimes) {
+          // Create a temporary copy for the UI to display each time separately
+          filteredMeds.add(
+            Medication(
+              id: med.id,
+              name: med.name,
+              dosage: med.dosage,
+              time: individualTime, // Now "8:00 AM", then "4:00 PM", etc.
+              completedDates: med.completedDates,
+              startDate: med.startDate,
+              endDate: med.endDate,
+              instructions: med.instructions,
+              frequency: med.frequency,
+            ),
+          );
+        }
+      }
+    }
+    return filteredMeds;
   }
 
   /// Adds a new medication to the active medications list
@@ -75,7 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
@@ -231,8 +268,12 @@ class _HomeScreenState extends State<HomeScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(med.time, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue)),
-                  Text("Scheduled", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(med.time,
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryBlue)),
+                  Text("Scheduled",
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
               SizedBox(width: 20),
@@ -241,7 +282,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(med.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(med.name,
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     Text(med.dosage, style: TextStyle(color: Colors.black54)),
                   ],
                 ),
@@ -251,15 +294,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 scale: 1.2,
                 child: Checkbox(
                   //check if the current date (at midnight) is in the completedDates list for this medication
-                  value: med.completedDates.any((d) => DateUtils.isSameDay(d, selectedDate)),
+                  value: med.completedDates
+                      .any((d) => DateUtils.isSameDay(d, selectedDate)),
                   activeColor: AppColors.primaryBlue,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   onChanged: (bool? value) {
                     setState(() {
                       if (value == true) {
                         med.completedDates.add(selectedDate);
                       } else {
-                        med.completedDates.removeWhere((d) => DateUtils.isSameDay(d, selectedDate));
+                        med.completedDates.removeWhere(
+                            (d) => DateUtils.isSameDay(d, selectedDate));
                       }
                     });
                   },
@@ -273,9 +319,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  // Dit zorgt ervoor dat telkens wanneer we terugkomen op dit scherm (bijvoorbeeld na Navigator.pop of switch in navbar), de UI ververst.
-  setState(() {}); 
-}
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Dit zorgt ervoor dat telkens wanneer we terugkomen op dit scherm (bijvoorbeeld na Navigator.pop of switch in navbar), de UI ververst.
+    setState(() {});
+  }
 }
