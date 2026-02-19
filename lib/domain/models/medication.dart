@@ -21,7 +21,7 @@ class Medication {
     required this.startDate,
     required this.instructions,
     List<DateTime>? completedDates,
-  }) : this.completedDates = completedDates ?? [];
+  }) : completedDates = completedDates ?? [];
 
   /// ==========================
   /// FROM FIRESTORE

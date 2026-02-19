@@ -59,13 +59,13 @@ class MediMindApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // Set SplashScreen as the initial screen
-      home: AuthGate(),
+      home: const AuthGate(),
       routes: {
         '/signup': (context) => const RegisterScreen(),
-        '/medications': (context) => MedicationsScreen(),
-        '/medical_id': (context) => MedicalIdScreen(),
-        '/support': (context) => SupportScreen(),
-        '/privacy': (context) => PrivacyScreen(),
+        '/medications': (context) => const MedicationsScreen(),
+        '/medical_id': (context) => const MedicalIdScreen(),
+        '/support': (context) => const SupportScreen(),
+        '/privacy': (context) => const PrivacyScreen(),
         '/notifications': (context) => const NotificationSettingsScreen(),
       },
     );

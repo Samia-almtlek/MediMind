@@ -32,7 +32,7 @@ class ScanLogRepositoryImpl implements ScanLogRepository {
     return snapshot.docs
         .map((doc) =>
             ScanLogModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 }

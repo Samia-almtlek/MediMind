@@ -19,7 +19,7 @@ class DoseLogRepositoryImpl implements DoseLogRepository {
     return snapshot.docs
         .map((doc) =>
             DoseLogModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 

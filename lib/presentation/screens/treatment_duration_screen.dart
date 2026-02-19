@@ -19,7 +19,7 @@ class TreatmentDurationScreen extends StatefulWidget {
   final String dosage;
   final String? notes;
 
-  TreatmentDurationScreen({
+  const TreatmentDurationScreen({super.key, 
     required this.medicationName,
     required this.dosage,
     this.notes,
@@ -37,7 +37,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   int frequency = 1;
 
   // List of times for each daily dose (length matches frequency)
-  List<TimeOfDay> selectedTimes = [TimeOfDay(hour: 8, minute: 0)];
+  List<TimeOfDay> selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
 
   // Updates the list of intake times when frequency changes
   // logic behind is that it evenly distributes throughout the day
@@ -77,11 +77,11 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
+        title: const Text("Schedule Logic", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -90,31 +90,31 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "Duration",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             _buildDurationGrid(),
             if (selectedDuration == "Custom") _buildCustomDaysInput(),
-            SizedBox(height: 30),
-            Text(
+            const SizedBox(height: 30),
+            const Text(
               "Daily Frequency",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             _buildFrequencyDropdown(),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               "Intake Times",
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             _buildTimePickerList(),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             _buildCenteredSummary(),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
-                minimumSize: Size(double.infinity, 55),
+                minimumSize: const Size(double.infinity, 55),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -205,7 +205,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   );
                 }
               },
-              child: Text(
+              child: const Text(
                 "Confirm & Save",
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
@@ -276,7 +276,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
             onPressed: () => _selectTime(index),
             child: Text(
               selectedTimes[index].format(context),
-              style: TextStyle(fontSize: 18, color: AppColors.primaryBlue),
+              style: const TextStyle(fontSize: 18, color: AppColors.primaryBlue),
             ),
           ),
         );
@@ -294,7 +294,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     return Center(
       child: Container(
         width: double.infinity, // Zorgt voor een mooie uitlijning
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.lightTeal.withOpacity(0.3),
           borderRadius: BorderRadius.circular(15),
@@ -302,17 +302,17 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         ),
         child: Column(
           children: [
-            Text(
+            const Text(
               "Schedule Overview",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            Divider(),
+            const Divider(),
             Text("Medication: ${widget.medicationName} (${widget.dosage})"),
             Text("Frequency: $frequency times daily"),
             Text("Duration: $totalDays days"),
             Text(
               "Total Doses: ${totalDays * frequency}",
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.primaryBlue,
                 fontWeight: FontWeight.bold,
               ),
@@ -320,8 +320,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
 
             // Toon notities alleen als ze niet leeg zijn
             if (widget.notes != null && widget.notes!.isNotEmpty) ...[
-              Divider(),
-              Text(
+              const Divider(),
+              const Text(
                 "Notes:",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
@@ -330,7 +330,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 child: Text(
                   widget.notes!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontStyle: FontStyle.italic,
                     color: Colors.black87,
                   ),

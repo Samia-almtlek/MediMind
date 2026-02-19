@@ -154,7 +154,7 @@ void _showVerificationDialog() {
 
   Widget _buildBloodTypeDropdown() {
     return DropdownButtonFormField<String>(
-      value: selectedBloodType,
+      initialValue: selectedBloodType,
       decoration: _inputDecoration("Blood Type", Icons.bloodtype),
       items: bloodTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
       onChanged: isEditing ? (val) => setState(() => selectedBloodType = val) : null,

@@ -62,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               as ImageProvider)
                             : null,
                         child: user?.photoURL == null
-                            ? Icon(Icons.person,
+                            ? const Icon(Icons.person,
                                 size: 60, color: AppColors.primaryBlue)
                             : null,
                       ),
@@ -84,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             padding: const EdgeInsets.all(4),
                             decoration: const BoxDecoration(
                                 color: Colors.white, shape: BoxShape.circle),
-                            child: Icon(Icons.camera_alt,
+                            child: const Icon(Icons.camera_alt,
                                 size: 20, color: AppColors.iconGrey),
                           ),
                         ),
@@ -95,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // shows displayname of 'User' if its null
                   Text(
                     user?.displayName ?? "MediMind User",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -153,7 +153,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   '/notifications'), // Navigate to the notification settings screen
               trailing: Switch(
                 value: _notificationsEnabled,
-                activeColor: AppColors.primaryBlue,
+                activeThumbColor: AppColors.primaryBlue,
                 onChanged: (val) {
                   setState(() {
                     _notificationsEnabled = val;

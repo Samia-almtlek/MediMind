@@ -35,7 +35,7 @@ class ChatSessionRepositoryImpl
     return snapshot.docs
         .map((doc) =>
             ChatSessionModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 

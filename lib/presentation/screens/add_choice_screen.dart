@@ -5,6 +5,8 @@ import 'package:medimind/presentation/screens/scan_barcode_screen.dart';
 
 //Screen that presents two options for adding medication (manual or throufgh scanning)
 class AddChoiceScreen extends StatelessWidget {
+  const AddChoiceScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -12,10 +14,10 @@ class AddChoiceScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Add Medication", style: TextStyle(color: Colors.black)),
+        title: const Text("Add Medication", style: TextStyle(color: Colors.black)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -30,7 +32,7 @@ class AddChoiceScreen extends StatelessWidget {
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (context) => ManualInputScreen())),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             //  scanning option
             _buildOptionCard(
               context,
@@ -57,7 +59,7 @@ class AddChoiceScreen extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.shade200),
           borderRadius: BorderRadius.circular(16),
@@ -65,13 +67,13 @@ class AddChoiceScreen extends StatelessWidget {
         child: Column(
           children: [
             Icon(icon, size: 48, color: AppColors.primaryBlue),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(title,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
             Text(subtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
+                style: const TextStyle(color: Colors.grey)),
           ],
         ),
       ),

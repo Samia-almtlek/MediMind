@@ -23,7 +23,7 @@ class ChatMessageRepositoryImpl
     return snapshot.docs
         .map((doc) =>
             ChatMessageModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 

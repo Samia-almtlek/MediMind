@@ -93,11 +93,11 @@ class _AuthGateState extends State<AuthGate> {
           if (user.emailVerified) {
             return MainScreen();
           } else {
-            return LoginScreen();
+            return const LoginScreen();
           }
         }
 
-        return LoginScreen();
+        return const LoginScreen();
       },
     );
   }

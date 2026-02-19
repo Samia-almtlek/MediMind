@@ -5,6 +5,8 @@ import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
 class ManualInputScreen extends StatefulWidget {
+  const ManualInputScreen({super.key});
+
   @override
   _ManualInputScreenState createState() => _ManualInputScreenState();
 }
@@ -165,7 +167,7 @@ class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
 
-  const SSurfaceButton({
+  const SSurfaceButton({super.key, 
     required this.text,
     required this.onPressed,
   });

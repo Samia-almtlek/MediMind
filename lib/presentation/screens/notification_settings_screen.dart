@@ -159,7 +159,7 @@ class _NotificationSettingsScreenState
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: Switch(
           value: value,
-          activeColor: AppColors.primaryBlue,
+          activeThumbColor: AppColors.primaryBlue,
           onChanged: onChanged,
         ),
       ),

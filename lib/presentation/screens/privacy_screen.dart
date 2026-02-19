@@ -36,7 +36,7 @@ class PrivacyScreen extends StatelessWidget {
         );
         await user.reauthenticateWithCredential(credential);
         await _deleteEverything(context);
-      } on FirebaseAuthException catch (e) {
+      } on FirebaseAuthException {
         String errorMessage = "Incorrect password.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),
@@ -46,7 +46,7 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showDeleteDialog(BuildContext context) {
-    final TextEditingController _passwordConfirmController = TextEditingController();
+    final TextEditingController passwordConfirmController = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -57,7 +57,7 @@ class PrivacyScreen extends StatelessWidget {
             const Text("Under GDPR, you have the right to have all your data erased permanently."),
             const SizedBox(height: 15),
             TextField(
-              controller: _passwordConfirmController,
+              controller: passwordConfirmController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: "Confirm with password",
@@ -71,9 +71,9 @@ class PrivacyScreen extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
-              if (_passwordConfirmController.text.isNotEmpty) {
+              if (passwordConfirmController.text.isNotEmpty) {
                 Navigator.pop(dialogContext);
-                _reauthenticateAndDelete(context, _passwordConfirmController.text);
+                _reauthenticateAndDelete(context, passwordConfirmController.text);
               }
             },
             child: const Text("Delete Everything", style: TextStyle(color: Colors.white)),
