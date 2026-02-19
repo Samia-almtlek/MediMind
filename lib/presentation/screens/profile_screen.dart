@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,8 +16,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true; // Placeholder for notification settings
 
   // Function to refresh user data after editing profile
-  void _refreshUser() {
-    setState(() {});
+  Future<void> _refreshUser() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await user.reload(); // forces firebase to refresh the user data
+      setState(() {
+        // the build() method will automatically use the updated user data from FirebaseAuth.instance.currentUser
+      });
+    }
   }
 
   @override
@@ -48,7 +56,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         radius: 55,
                         backgroundColor: AppColors.lightTeal.withOpacity(0.5),
                         backgroundImage: user?.photoURL != null
-                            ? NetworkImage(user!.photoURL!)
+                          ? (user!.photoURL!.startsWith('http')
+                            ? NetworkImage(user.photoURL!)
+                            : FileImage(File(user.photoURL!))
+                              as ImageProvider)
                             : null,
                         child: user?.photoURL == null
                             ? Icon(Icons.person,
@@ -63,14 +74,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             // Navigates to the EditProfileScreen and waits for it to pop before refreshing user data
                             await Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const EditProfileScreen()),
                             );
-                            _refreshUser(); // Trigger rebuild to show updated profile picture
+                            await _refreshUser(); // Trigger rebuild to show updated profile picture
                           },
                           child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                            child: Icon(Icons.camera_alt, size: 20, color: AppColors.iconGrey),
+                            decoration: const BoxDecoration(
+                                color: Colors.white, shape: BoxShape.circle),
+                            child: Icon(Icons.camera_alt,
+                                size: 20, color: AppColors.iconGrey),
                           ),
                         ),
                       ),
@@ -102,9 +117,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const EditProfileScreen()),
                 );
-                _refreshUser();
+                await _refreshUser();
               },
             ),
 
@@ -169,7 +185,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-              leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+              leading:
+                  const Icon(Icons.logout_rounded, color: Colors.redAccent),
               title: const Text(
                 "Logout",
                 style: TextStyle(
