@@ -4,6 +4,11 @@ import '../../utils/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'success_screen.dart';
 import '../../domain/models/medication.dart';
+import '../../data/repositories_impl/user_medication_repository_impl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../service/database/firestore_service.dart';
+import '../../domain/entities/user_medication_entity.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
@@ -91,24 +96,20 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
             ),
             _buildDurationGrid(),
             if (selectedDuration == "Custom") _buildCustomDaysInput(),
-
             SizedBox(height: 30),
             Text(
               "Daily Frequency",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             _buildFrequencyDropdown(),
-
             SizedBox(height: 20),
             Text(
               "Intake Times",
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             _buildTimePickerList(),
-
             SizedBox(height: 30),
             _buildCenteredSummary(),
-
             SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -118,32 +119,91 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () {
+              onPressed: () async {
+                // 1. Calculate the total days
                 int totalDays = selectedDuration == "Custom"
                     ? customDays
                     : int.parse(selectedDuration.split(' ')[0]);
 
-                DateTime calculatedEndDate = DateTime.now().add(Duration(days: totalDays -1)); //to avoid off-by-one error where the end date is actually the first day after the treatment ends
+                DateTime startDate = DateTime.now();
+                DateTime calculatedEndDate =
+                    startDate.add(Duration(days: totalDays - 1));
 
-                // Create a medication entry for each selected time
-                for (var time in selectedTimes) {
-                  userAddedMeds.add(
-                    Medication(
-                      name: widget.medicationName,
-                      dosage: widget.dosage,
-                      time: time.format(context),
-                      endDate: calculatedEndDate,
-                      completedDates: [],
+                // 2. Access your Repository (Assuming you use a locator or Provider)
+                // If you don't use a locator, you'd instantiate it:
+                // final repo = UserMedicationRepositoryImpl(FirestoreService());
+                final repository =
+                    UserMedicationRepositoryImpl(FirestoreService());
+
+                try {
+                  // Get current user ID
+                  final User? user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              "You must be logged in to save medication.")),
+                    );
+                    return;
+                  }
+                  final String uid = user.uid;
+
+                  // 3. Create the Entity
+                  // Note: Since your DB model seems to store one record per medication "plan",
+                  // we save the frequency and instructions together.
+
+                  final newMedication = UserMedicationEntity(
+                    id: FirebaseFirestore.instance
+                        .collection('user_medications')
+                        .doc()
+                        .id, // Generate ID
+                    userId: uid,
+                    productId: "",
+                    name: widget.medicationName,
+                    dosage: widget.dosage,
+                    frequencyPerDay: frequency,
+                    startDate: startDate,
+                    endDate: calculatedEndDate,
+                    instructions:
+                        "Times: ${selectedTimes.map((t) => t.format(context)).join(', ')}. Notes: ${widget.notes ?? ''}",
+                    isActive: true,
+                    aangemaaktViaOCR: false,
+                  );
+
+                  // 4. Save to Firestore
+                  await repository.addUserMedication(newMedication);
+
+                  for (var time in selectedTimes) {
+                    userAddedMeds.add(
+                      Medication(
+                        name: widget.medicationName,
+                        dosage: widget.dosage,
+                        frequency: "$frequency times per day",
+                        time: time.format(context),
+                        endDate: calculatedEndDate,
+                        completedDates: [],
+                        startDate: startDate,
+                        instructions:
+                            "Times: ${selectedTimes.map((t) => t.format(context)).join(', ')}. Notes: ${widget.notes ?? ''}",
+                      ),
+                    );
+                  }
+
+                  // Create a medication entry for each selected time
+
+                  // 5. Navigate on Success
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SuccessScreen(medicationName: widget.medicationName),
                     ),
                   );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error saving medication: $e")),
+                  );
                 }
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SuccessScreen(medicationName: widget.medicationName),
-                  ),
-                );
               },
               child: Text(
                 "Confirm & Save",
