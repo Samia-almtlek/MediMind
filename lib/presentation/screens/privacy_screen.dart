@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart' show EmailAuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
+import 'package:medimind/service/pdf_service.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -143,7 +144,13 @@ class PrivacyScreen extends StatelessWidget {
             "Right of Access", 
             "Download a copy of your medical data", 
             Icons.download_outlined,
-            onTap: () => _exportData(context),
+            onTap: () async {
+              final _myMedications = Hive.box<Map>('medication_stock')
+                  .values
+                  .map((med) => Map<String, dynamic>.from(med))
+                  .toList();
+              await PdfService.generateHealthReport(_myMedications);
+            },
           ),
           _buildPrivacyTile(
             "Data Processing", 
