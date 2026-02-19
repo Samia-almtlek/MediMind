@@ -80,15 +80,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               children: [
                 GestureDetector(
                   onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: AppColors.lightTeal,
-                    backgroundImage: _imageFile != null 
-                        ? FileImage(_imageFile!) 
-                        : (user?.photoURL != null ? NetworkImage(user!.photoURL!) : null) as ImageProvider?,
-                    child: _imageFile == null && user?.photoURL == null
-                        ? const Icon(Icons.camera_alt, size: 40, color: Colors.white)
-                        : null,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: AppColors.lightTeal,
+                        backgroundImage: _imageFile != null 
+                            ? FileImage(_imageFile!) 
+                            : (user?.photoURL != null ? NetworkImage(user!.photoURL!) : null) as ImageProvider?,
+                      ),
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.camera_alt,
+                            size: 38,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),
