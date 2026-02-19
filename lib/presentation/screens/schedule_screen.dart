@@ -7,7 +7,11 @@ import '../../domain/models/medication.dart';
 class ScheduleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final Map<String, List<Medication>> groupedMeds = _groupMedsByMonth(userAddedMeds);
+    // Process the global list to split multiple times into individual entries
+    final List<Medication> flattenedMeds =
+        _getFlattenedMedicationList(userAddedMeds);
+    final Map<String, List<Medication>> groupedMeds =
+        _groupMedsByMonth(flattenedMeds);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -20,18 +24,53 @@ class ScheduleScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: userAddedMeds.isEmpty 
-          ? _buildEmptyState() 
+      body: flattenedMeds.isEmpty
+          ? _buildEmptyState()
           : _buildGroupedTreatmentList(groupedMeds),
     );
   }
 
-  // Helper function to build the list of treatments grouped by month
+  /// NEW: Helper to turn 1 Medication with 3 times into 3 Medication entries for display
+  List<Medication> _getFlattenedMedicationList(List<Medication> meds) {
+    List<Medication> results = [];
+    for (var med in meds) {
+      // Extract times from: "Times: 8:00 AM, 4:00 PM. Notes: ..."
+      String timePart =
+          med.instructions.split("Notes:")[0].replaceAll("Times: ", "").trim();
+
+      // Split by comma and clean up whitespace
+      List<String> allTimes = timePart
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (allTimes.isEmpty) {
+        results.add(med); // Fallback if parsing fails
+      } else {
+        for (String t in allTimes) {
+          results.add(
+            Medication(
+              id: med.id,
+              name: med.name,
+              dosage: med.dosage,
+              time: t, // Set the specific time for this card
+              startDate: med.startDate,
+              endDate: med.endDate,
+              completedDates: med.completedDates,
+              instructions: med.instructions,
+              frequency: med.frequency,
+            ),
+          );
+        }
+      }
+    }
+    return results;
+  }
+
   Map<String, List<Medication>> _groupMedsByMonth(List<Medication> meds) {
     Map<String, List<Medication>> groups = {};
     for (var med in meds) {
-      // Because our model currently doesn't have a DateTime, we use 'today'
-      // In the future, replace this with med.startDate
       String monthKey = DateFormat('MMMM yyyy').format(med.endDate);
       if (groups[monthKey] == null) groups[monthKey] = [];
       groups[monthKey]!.add(med);
@@ -50,19 +89,17 @@ class ScheduleScreen extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dynamic month header based on the medication's end date
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+              padding:
+                  const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
               child: Text(
                 month,
                 style: TextStyle(
-                  fontSize: 20, 
-                  fontWeight: FontWeight.bold, 
-                  color: AppColors.iconGrey
-                ),
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.iconGrey),
               ),
             ),
-            // The cards for this specific month
             ...medsInMonth.map((med) => _buildTreatmentCard(med)).toList(),
           ],
         );
@@ -71,13 +108,16 @@ class ScheduleScreen extends StatelessWidget {
   }
 
   Widget _buildTreatmentCard(Medication med) {
-    // responsible for determining if the treatment is still active or has finished based on the end date
-    final DateTime today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    final DateTime endDateOnly = DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
-    
+    final DateTime today =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final DateTime endDateOnly =
+        DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+
     bool isDatePassed = today.isAfter(endDateOnly);
-    bool isFullyCompleted = med.completedDates.any((d)=> DateUtils.isSameDay(d, endDateOnly));
-    // Check if the current date is before the end date
+    // Note: If you want specific completion for specific times,
+    // you'll eventually need to store completed times in Firestore too.
+    bool isFullyCompleted =
+        med.completedDates.any((d) => DateUtils.isSameDay(d, endDateOnly));
     final bool isActive = !isDatePassed && !isFullyCompleted;
 
     return Container(
@@ -102,7 +142,7 @@ class ScheduleScreen extends StatelessWidget {
               color: AppColors.lightTeal.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.medication, color: AppColors.primaryBlue),
+            child: Icon(Icons.access_time_filled, color: AppColors.primaryBlue),
           ),
           SizedBox(width: 16),
           Expanded(
@@ -119,10 +159,10 @@ class ScheduleScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  "Time: ${med.time}",
+                  "Scheduled for: ${med.time}",
                   style: TextStyle(
                     color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -141,22 +181,22 @@ class ScheduleScreen extends StatelessWidget {
         color: isActive ? Colors.green[50] : Colors.red[50],
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-            color: isActive ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
-            width: 1,
-          ),
+          color: isActive
+              ? Colors.green.withOpacity(0.3)
+              : Colors.red.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Text(
-        isActive ? "Active" : "Inactive",
+        isActive ? "Active" : "Finished",
         style: TextStyle(
-          color: isActive ? Colors.green : Colors.red, 
-          fontSize: 12, 
-          fontWeight: FontWeight.bold
-        ),
+            color: isActive ? Colors.green : Colors.red,
+            fontSize: 12,
+            fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  // Shown when no medications have been added yet
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -166,7 +206,8 @@ class ScheduleScreen extends StatelessWidget {
           SizedBox(height: 16),
           Text(
             "No active treatment plans",
-            style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
@@ -180,5 +221,4 @@ class ScheduleScreen extends StatelessWidget {
       ),
     );
   }
-
 }

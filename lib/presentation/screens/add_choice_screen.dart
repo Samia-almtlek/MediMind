@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'manual_input_screen.dart';
+import 'package:medimind/presentation/screens/scan_barcode_screen.dart';
 
 //Screen that presents two options for adding medication (manual or throufgh scanning)
 class AddChoiceScreen extends StatelessWidget {
@@ -26,18 +27,19 @@ class AddChoiceScreen extends StatelessWidget {
               title: "Manual Input",
               subtitle: "Enter medication details step-by-step manually.",
               icon: Icons.edit_outlined,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ManualInputScreen())),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => ManualInputScreen())),
             ),
             SizedBox(height: 20),
-            //  scanning option 
+            //  scanning option
             _buildOptionCard(
               context,
-              title: "Scan Prescription (OCR)",
-              subtitle: "Use your camera to scan details from a physical label.",
+              title: "Scan barcode",
+              subtitle:
+                  "Use your camera to scan details from a physical label.",
               icon: Icons.document_scanner_outlined,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("OCR coming soon!")));
-              },
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => ScanBarcodeScreen())),
             ),
           ],
         ),
@@ -46,7 +48,11 @@ class AddChoiceScreen extends StatelessWidget {
   }
 
   /// Builds a clickable card for each medication input option
-  Widget _buildOptionCard(BuildContext context, {required String title, required String subtitle, required IconData icon, required VoidCallback onTap}) {
+  Widget _buildOptionCard(BuildContext context,
+      {required String title,
+      required String subtitle,
+      required IconData icon,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -60,9 +66,12 @@ class AddChoiceScreen extends StatelessWidget {
           children: [
             Icon(icon, size: 48, color: AppColors.primaryBlue),
             SizedBox(height: 12),
-            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            Text(subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey)),
           ],
         ),
       ),
