@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:medimind/service/chatbot/authorized_context_provider.dart';
+import 'package:medimind/service/chatbot/chatbot_prompts.dart';
+import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
+import 'package:medimind/service/chatbot/lm_studio_config.dart';
 import '../../utils/app_colors.dart';
-import 'dart:async';
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -10,6 +13,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AuthorizedContextProvider _contextProvider =
+      LocalDrugListContextProvider();
+  late final LmStudioChatClient _chatClient;
   // Toggle between 'Quick' and 'Detailed' models
   bool _isDetailedMode = false;
   bool _isTyping = false; // To show typing indicator
@@ -34,10 +40,17 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
   }
-  
-  void _handleSendMessage() {
+
+  @override
+  void initState() {
+    super.initState();
+    _chatClient = LmStudioChatClient();
+  }
+
+  Future<void> _handleSendMessage() async {
     if (_controller.text.trim().isEmpty) return;
-    final userText= _controller.text;
+    if (_isTyping) return;
+    final userText = _controller.text.trim();
 
     setState(() {
       // Add user message
@@ -47,21 +60,50 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Simulate AI response after a short delay
-    Timer(Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isTyping = false;
-          // Simulate AI response based on selected model
-          String response = _isDetailedMode
-              ? "Detailed Analysis: Research suggests that ${userText.toLowerCase().contains('aspirin') ? 'Aspirin' : 'this medication'} can have interactions with blood thinners. Always consult your doctor for a clinical diagnosis."
-              : "Quick Check: Generally safe, but take it after a meal to avoid stomach upset.";
+    String response;
 
-          _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
-        });
-        _scrollToBottom();
+    try {
+      final endpoint = LmStudioConfig.completionUri;
+      if (endpoint == null) {
+        throw LmStudioException(
+          'LM Studio URL is missing. Run with --dart-define=LM_STUDIO_BASE_URL=http://169.254.5.254:1234',
+        );
       }
+
+      final authorizedContext =
+          await _contextProvider.buildAuthorizedContext(userText);
+
+      response = await _chatClient.complete(
+        endpoint: endpoint,
+        model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+        authorizedContext: authorizedContext,
+        question: userText,
+      );
+    } on LmStudioException catch (error) {
+      response =
+          'I cannot complete this request right now: ${error.message}';
+    } catch (_) {
+      response =
+          'I cannot complete this request right now. Please verify LM Studio is running and reachable.';
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isTyping = false;
+      _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
     });
+    _scrollToBottom();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _chatClient.dispose();
+    super.dispose();
   }
 
   @override
@@ -245,12 +287,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-              onSubmitted: (_) => _handleSendMessage(),
+              onSubmitted: (_) {
+                _handleSendMessage();
+              },
             ),
           ),
           SizedBox(width: 12),
           GestureDetector(
-            onTap: _handleSendMessage,
+            onTap: () {
+              _handleSendMessage();
+            },
             child: CircleAvatar(
               radius: 25,
               backgroundColor: AppColors.primaryBlue,
