@@ -145,11 +145,25 @@ class PrivacyScreen extends StatelessWidget {
             "Download a copy of your medical data", 
             Icons.download_outlined,
             onTap: () async {
-              final medBox = Hive.box('medication_stock');
-              final items = List<Map<String, dynamic>>.from(
-                medBox.get('items', defaultValue: []),
-              );
-              await PdfService.generateHealthReport(items);
+              try {
+                final medBox = Hive.box('medication_stock');
+                final rawItems = medBox.get('items', defaultValue: []);
+
+                final items = (rawItems as List)
+                    .whereType<Map>()
+                    .map((item) => Map<String, dynamic>.from(item))
+                    .toList();
+
+                await PdfService.generateHealthReport(items);
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Export failed: $e'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
             },
           ),
           _buildPrivacyTile(
