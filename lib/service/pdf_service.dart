@@ -11,6 +11,9 @@ class PdfService {
     final pdf = pw.Document();
     final user = FirebaseAuth.instance.currentUser;
     final medicalBox = Hive.box('medical_id_data');
+    final now = DateTime.now();
+    final formattedDate =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
 
     // take data of medical id screen
     final bloodType = medicalBox.get('bloodType', defaultValue: 'Unknown');
@@ -27,7 +30,7 @@ class PdfService {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Text("MediMind Health Report", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800)),
-              pw.Text("Date: 19/02/2026", style: const pw.TextStyle(color: PdfColors.grey)),
+              pw.Text("Date: $formattedDate", style: const pw.TextStyle(color: PdfColors.grey)),
             ],
           ),
           pw.Divider(thickness: 2, color: PdfColors.blueGrey),
