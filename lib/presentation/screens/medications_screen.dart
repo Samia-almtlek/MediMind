@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/app_colors.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class MedicationsScreen extends StatefulWidget {
   const MedicationsScreen({super.key});
@@ -195,16 +196,53 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
       child: Column(
         children: [
           Row(
+  children: [
+    Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.medication, color: statusColor),
+    ),
+    const SizedBox(width: 15),
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.medication, color: statusColor)),
-              const SizedBox(width: 15),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(med['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(med['dosage'], style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-              ])),
-              Text("${med['currentStock']}/${med['maxStock']}", style: TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
+              Expanded(
+                child: Text(
+                  med['name'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              SpeakerButton(
+                text:
+                    "${med['name']}, dosage ${med['dosage']}. "
+                    "Current stock ${med['currentStock']} out of ${med['maxStock']}.",
+                size: 20,
+                color: statusColor,
+              ),
             ],
           ),
+          Text(
+            med['dosage'],
+            style: TextStyle(color: Colors.grey[500], fontSize: 12),
+          ),
+        ],
+      ),
+    ),
+    Text(
+      "${med['currentStock']}/${med['maxStock']}",
+      style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+    ),
+  ],
+),
           const SizedBox(height: 15),
           ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.grey[100], valueColor: AlwaysStoppedAnimation<Color>(statusColor))),
         ],

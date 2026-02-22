@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../utils/app_colors.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class MedicalIdScreen extends StatefulWidget {
   const MedicalIdScreen({super.key});
@@ -119,6 +120,17 @@ void _showVerificationDialog() {
 
     setState(() => isEditing = false);
   }
+  String _buildMedicalSummary() {
+  String allergyText = allergies.isEmpty 
+      ? "No allergies recorded." 
+      : allergies.join(", ");
+
+  return "Medical ID information. "
+      "Blood type: ${selectedBloodType ?? "Not specified"}. "
+      "Allergies: $allergyText. "
+      "Emergency contact: ${_contactNameController.text.isEmpty ? "Not specified" : _contactNameController.text}. "
+      "Phone: ${_phoneController.text.isEmpty ? "Not specified" : _phoneController.text}.";
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,12 +138,17 @@ void _showVerificationDialog() {
       appBar: AppBar(
         title: const Text("Medical ID", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: Icon(isEditing ? Icons.check : Icons.edit, color: AppColors.primaryBlue),
-            onPressed: isEditing ? _saveData : () => setState(() => isEditing = true),
-          )
-        ],
+      actions: [
+  SpeakerButton(
+    text: _buildMedicalSummary(),
+    size: 22,
+    color: AppColors.primaryBlue,
+  ),
+  IconButton(
+    icon: Icon(isEditing ? Icons.check : Icons.edit, color: AppColors.primaryBlue),
+    onPressed: isEditing ? _saveData : () => setState(() => isEditing = true),
+  ),
+],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

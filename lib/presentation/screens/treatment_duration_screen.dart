@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../service/database/firestore_service.dart';
 import '../../domain/entities/user_medication_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../core/widgets/speaker_button.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
@@ -72,7 +73,24 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
       });
     }
   }
+String _buildTreatmentSummary() {
+  int totalDays = selectedDuration == "Custom"
+      ? customDays
+      : int.parse(selectedDuration.split(' ')[0]);
 
+  String summary =
+      "Treatment plan for ${widget.medicationName}. "
+      "Dosage ${widget.dosage}. "
+      "$frequency times per day. "
+      "For $totalDays days. "
+      "Total doses ${totalDays * frequency}. ";
+
+  if (widget.notes != null && widget.notes!.isNotEmpty) {
+    summary += "Notes: ${widget.notes}.";
+  }
+
+  return summary;
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -306,6 +324,12 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
               "Schedule Overview",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
+            const SizedBox(height: 8),
+SpeakerButton(
+  text: _buildTreatmentSummary(),
+  size: 22,
+  color: AppColors.primaryBlue,
+),
             Divider(),
             Text("Medication: ${widget.medicationName} (${widget.dosage})"),
             Text("Frequency: $frequency times daily"),
