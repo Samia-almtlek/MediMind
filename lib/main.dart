@@ -41,7 +41,7 @@ Future<void> main() async {
   // Add the following: the box for medical ID (we use a dynamic box for different types)
   await Hive.openBox('medical_id_data');
   // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
-  await Hive.openBox<Map>('medication_stock');
+  await Hive.openBox('medication_stock');
 
   print('🗄️ Hive initialized successfully');
 
