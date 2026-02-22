@@ -3,6 +3,7 @@ import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/widgets/speaker_button.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -282,10 +283,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(med.name,
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(med.dosage, style: TextStyle(color: Colors.black54)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            med.name,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        SpeakerButton(
+                          text: "${med.time}, ${med.name}, ${med.dosage}",
+                          size: 20,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ],
+                    ),
+                    Text(
+                      med.dosage,
+                      style: TextStyle(color: Colors.black54),
+                    ),
                   ],
                 ),
               ),

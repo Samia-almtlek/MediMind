@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-
+import '../../core/widgets/speaker_button.dart';
 class SuccessScreen extends StatelessWidget {
   final String medicationName;
 
@@ -35,6 +35,12 @@ class SuccessScreen extends StatelessWidget {
                 "Great!",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
+              SizedBox(height: 10),
+SpeakerButton(
+  text: "Great. $medicationName has been successfully added to your schedule.",
+  size: 24,
+  color: AppColors.primaryBlue,
+),
               SizedBox(height: 10),
               Text(
                 "$medicationName has been successfully added to your schedule.",

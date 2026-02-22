@@ -3,8 +3,23 @@ import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:intl/intl.dart';
 import '../../domain/models/medication.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class ScheduleScreen extends StatelessWidget {
+  String _buildScheduleSummary(List<Medication> meds) {
+  if (meds.isEmpty) {
+    return "You currently have no active treatment plans.";
+  }
+
+  String summary = "Your treatment plan includes ";
+
+  for (var med in meds) {
+    summary +=
+        "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}. ";
+  }
+
+  return summary;
+}
   @override
   Widget build(BuildContext context) {
     // Process the global list to split multiple times into individual entries
@@ -15,15 +30,22 @@ class ScheduleScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(
-        title: Text(
-          "Treatment Plan",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-      ),
+     appBar: AppBar(
+  title: Text(
+    "Treatment Plan",
+    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+  ),
+  backgroundColor: Colors.white,
+  elevation: 0,
+  centerTitle: true,
+  actions: [
+    SpeakerButton(
+      text: _buildScheduleSummary(flattenedMeds),
+      size: 22,
+      color: AppColors.primaryBlue,
+    ),
+  ],
+),
       body: flattenedMeds.isEmpty
           ? _buildEmptyState()
           : _buildGroupedTreatmentList(groupedMeds),
