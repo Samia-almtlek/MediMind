@@ -16,7 +16,7 @@ class SuccessScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Groot groen vinkje icoon
+              // a circular container with check 
               Container(
                 width: 100,
                 height: 100,
