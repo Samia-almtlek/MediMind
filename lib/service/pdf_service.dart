@@ -77,11 +77,22 @@ class PdfService {
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        header: (context) => pw.Column(
+          children: [
+            _buildHeader(formattedDate),
+            pw.Divider(thickness: 1.5, color: PdfColors.blueGrey),
+            pw.SizedBox(height: 10),
+          ],
+        ),
+        footer: (context) => pw.Container(
+          alignment: pw.Alignment.centerRight,
+          padding: const pw.EdgeInsets.only(top: 8),
+          child: pw.Text(
+            'Page ${context.pageNumber} of ${context.pagesCount}',
+            style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+        ),
         build: (context) => [
-          _buildHeader(formattedDate),
-          pw.Divider(thickness: 2, color: PdfColors.blueGrey),
-          pw.SizedBox(height: 20),
-
           _buildPatientInfo(user, bloodType, allergies),
           pw.SizedBox(height: 20),
 
@@ -132,6 +143,7 @@ class PdfService {
           ),
           pw.SizedBox(height: 25),
 
+          pw.NewPage(),
           _buildMonthlyTakenTable(
             monthLabel: formattedMonth,
             monthlyTakenByMed: monthlyTakenByMed,
