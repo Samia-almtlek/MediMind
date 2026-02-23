@@ -3,6 +3,7 @@ import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'manual_input_screen.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -113,6 +114,154 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _deleteMedication(Medication med) async {
+    if (med.id.isEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection('user_medications')
+        .doc(med.id)
+        .delete();
+
+    setState(() {
+      userAddedMeds.removeWhere((item) => item.id == med.id);
+    });
+  }
+
+  void _showMoreActions() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.backgroundWhite,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Manage Medications",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 15),
+            Flexible(
+              child: userAddedMeds.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text("No medications active", style: TextStyle(color: Colors.grey)),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: userAddedMeds.length,
+                      itemBuilder: (context, index) {
+                        final med = userAddedMeds[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                          ),
+                          child: ListTile(
+                            leading: const Icon(Icons.medication_rounded, color: AppColors.primaryBlue),
+                            title: Text(med.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(med.dosage),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue),
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ManualInputScreen(medicationToEdit: med),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                  onPressed: () => _confirmDeletion(med),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.primaryBlue),
+        const SizedBox(width: 8),
+        Text(title, style: const TextStyle(color: AppColors.iconGrey, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildMenuOption({required IconData icon, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primaryBlue),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
+  void _confirmDeletion(Medication med) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Remove Medication?"),
+        content: Text("This will permanently delete ${med.name} from your schedule and database."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(context);
+              Navigator.pop(context);
+              await _deleteMedication(med);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text("${med.name} deleted"),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.black87,
+                ),
+              );
+            },
+            child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz, color: Colors.black),
-            onPressed: () {},
+            onPressed: _showMoreActions,
           ),
         ],
       ),
