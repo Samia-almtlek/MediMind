@@ -30,7 +30,7 @@ class AddChoiceScreen extends StatelessWidget {
               subtitle: "Enter medication details step-by-step manually.",
               icon: Icons.edit_outlined,
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => ManualInputScreen())),
+                  MaterialPageRoute(builder: (context) => const ManualInputScreen())),
             ),
             const SizedBox(height: 20),
             //  scanning option
@@ -41,7 +41,7 @@ class AddChoiceScreen extends StatelessWidget {
                   "Use your camera to scan details from a physical label.",
               icon: Icons.document_scanner_outlined,
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (context) => ScanBarcodeScreen())),
+                  MaterialPageRoute(builder: (context) => const ScanBarcodeScreen())),
             ),
           ],
         ),

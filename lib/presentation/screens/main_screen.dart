@@ -20,9 +20,9 @@ class _MainScreenState extends State<MainScreen> {
 
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
-    HomeScreen(), 
-    ScheduleScreen(), 
-    ChatScreen(),
+    const HomeScreen(), 
+    const ScheduleScreen(), 
+    const ChatScreen(),
     const ProfileScreen(),
   ];
 @override
@@ -53,7 +53,7 @@ void initState() {
 
   Navigator.push(
     context, 
-    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+    MaterialPageRoute(builder: (context) => const AddChoiceScreen())
   ) .then ((_) {
     setState(() {}); // Refresh the state when returning from AddChoiceScreen
   });
