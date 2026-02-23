@@ -125,9 +125,6 @@ class PdfService {
             taken: totalTaken,
             scheduled: totalScheduled,
           ),
-          pw.SizedBox(height: 12),
-          _buildAdherenceChart(adherenceRate),
-
           pw.SizedBox(height: 15),
           _buildWeeklyTakenChart(
             monthLabel: formattedMonth,
@@ -297,57 +294,6 @@ class PdfService {
           ),
         ],
       ),
-    );
-  }
-
-  static pw.Widget _buildAdherenceChart(double rate) {
-    final clampedRate = rate.clamp(0.0, 1.0);
-    const barWidth = 460.0;
-    const barHeight = 14.0;
-    final fillWidth = barWidth * clampedRate;
-
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text(
-          'Monthly adherence chart',
-          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12),
-        ),
-        pw.SizedBox(height: 8),
-        pw.Stack(
-          children: [
-            pw.Container(
-              width: barWidth,
-              height: barHeight,
-              decoration: pw.BoxDecoration(
-                color: PdfColors.grey300,
-                border: pw.Border.all(color: PdfColors.grey500, width: 0.4),
-              ),
-            ),
-            pw.Container(
-              width: fillWidth,
-              height: barHeight,
-              decoration: const pw.BoxDecoration(
-                color: PdfColors.blueGrey700,
-              ),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 2),
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('0%'),
-            pw.Text('50%'),
-            pw.Text('100%'),
-          ],
-        ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'Current month result: ${(clampedRate * 100).toStringAsFixed(1)}%',
-          style: const pw.TextStyle(color: PdfColors.blueGrey800, fontSize: 10),
-        ),
-      ],
     );
   }
 
