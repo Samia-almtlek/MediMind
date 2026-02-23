@@ -91,7 +91,7 @@ class _AuthGateState extends State<AuthGate> {
           final user = snapshot.data!;
 
           if (user.emailVerified) {
-            return MainScreen();
+            return const MainScreen();
           } else {
             return const LoginScreen();
           }

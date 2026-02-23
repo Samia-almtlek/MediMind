@@ -5,7 +5,7 @@ class Medication {
   final String name;
   final String dosage;
   final String time;
-  final String frequency; // e.g., "2x per day"
+  final String frequency; 
   final DateTime endDate;
   final DateTime startDate;
   final List<DateTime> completedDates;
@@ -29,6 +29,25 @@ class Medication {
   factory Medication.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
+    final rawCompletedDates = (data['completedDates'] as List?) ?? [];
+    final completedDates = rawCompletedDates
+        .map<DateTime?>((value) {
+          if (value is Timestamp) {
+            return value.toDate();
+          }
+          if (value is DateTime) {
+            return value;
+          }
+          return null;
+        })
+        .whereType<DateTime>()
+        .toList();
+
+    final frequencyPerDay = data['frequencyPerDay'];
+    final int frequencyValue = frequencyPerDay is int
+        ? frequencyPerDay
+        : int.tryParse('$frequencyPerDay') ?? 1;
+
     // Extracting the first time from the 'instructions' string (e.g., "8:00 AM")
     String rawInstructions = data['instructions'] ?? '';
     String extractedTime = "Not set";
@@ -45,10 +64,10 @@ class Medication {
       // Use the extracted time here:
       time: extractedTime,
       // Use 'frequencyPerDay' from your logs:
-      frequency: "${data['frequencyPerDay']}x per day",
+      frequency: "${frequencyValue}x per day",
       startDate: (data['startDate'] as Timestamp).toDate(),
       endDate: (data['endDate'] as Timestamp).toDate(),
-      completedDates: [], // Initialize empty or fetch from separate field
+      completedDates: completedDates,
       instructions: data['instructions'] ?? '',
     );
   }
