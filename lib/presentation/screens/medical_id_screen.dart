@@ -8,6 +8,7 @@ import '../../auth/service/auth_service.dart';
 import '../../service/database/firestore_service.dart';
 import '../../data/repositories_impl/caregiver_repository_impl.dart';
 import '../../domain/entities/caregiver_entity.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class MedicalIdScreen extends StatefulWidget {
   const MedicalIdScreen({super.key});

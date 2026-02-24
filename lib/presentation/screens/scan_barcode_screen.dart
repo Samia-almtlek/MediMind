@@ -5,7 +5,7 @@ import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../core/widgets/speaker_button.dart';
 class ScanBarcodeScreen extends StatefulWidget {
   @override
   _ScanBarcodeScreenState createState() => _ScanBarcodeScreenState();
@@ -120,11 +120,20 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
             children: [
               Text(
                 isFound ? "PRODUCT FOUND" : "NOT FOUND PRODUCT",
+                
                 style: TextStyle(
                   color: isFound ? Colors.green[800] : Colors.red[800],
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              SpeakerButton(
+  text: isFound
+      ? "Product found. $title. Dosage: $subtitle."
+      : "Product not found. This barcode is not in the database.",
+  size: 24,
+  color: AppColors.primaryBlue,
+),
+
               const SizedBox(height: 10),
               Text(title,
                   style: const TextStyle(

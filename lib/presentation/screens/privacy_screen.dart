@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart' show EmailAuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
+import '../../core/widgets/speaker_button.dart';
+
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -84,15 +86,37 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showInfoPopup(BuildContext context, String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(child: Text(content)),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Understood"))],
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          SpeakerButton(
+            text: content,
+            size: 20,
+            color: AppColors.primaryBlue,
+          ),
+        ],
       ),
-    );
-  }
+      content: SingleChildScrollView(child: Text(content)),
+      actions: [
+        TextButton(
+  onPressed: () async {
+    await SpeakerButton.stopSpeaking(); 
+    Navigator.pop(context);
+  },
+  child: const Text("Understood"),
+)
+      ],
+    ),
+  );
+}
 
   void _exportData(BuildContext context) {
     final box = Hive.box('medical_id_data');

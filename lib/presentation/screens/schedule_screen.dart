@@ -5,8 +5,24 @@ import 'package:intl/intl.dart';
 
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
+import '../../domain/models/medication.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class ScheduleScreen extends StatelessWidget {
+  String _buildScheduleSummary(List<Medication> meds) {
+  if (meds.isEmpty) {
+    return "You currently have no active treatment plans.";
+  }
+
+  String summary = "Your treatment plan includes ";
+
+  for (var med in meds) {
+    summary +=
+        "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}. ";
+  }
+
+  return summary;
+}
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;

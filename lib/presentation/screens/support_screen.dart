@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-
+import '../../core/widgets/speaker_button.dart';
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
@@ -158,11 +158,26 @@ class _SupportScreenState extends State<SupportScreen> {
               });
             },
           ),
-          if (isExpanded)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-              child: Text(_faqs[index]['answer']!, style: TextStyle(color: Colors.grey[700], height: 1.5)),
-            ),
+        if (isExpanded)
+  Padding(
+    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _faqs[index]['answer']!,
+          style: TextStyle(color: Colors.grey[700], height: 1.5),
+        ),
+        const SizedBox(height: 8),
+        SpeakerButton(
+          text:
+              "${_faqs[index]['question']!}. ${_faqs[index]['answer']!}",
+          size: 20,
+          color: AppColors.primaryBlue,
+        ),
+      ],
+    ),
+  ),
         ],
       ),
     );

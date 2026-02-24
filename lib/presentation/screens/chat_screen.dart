@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'dart:async';
+import '../../core/widgets/speaker_button.dart';
+
 
 class ChatScreen extends StatefulWidget {
   @override
@@ -215,12 +217,29 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        child: Text(
-          msg["text"],
-          style: TextStyle(color: isUser ? Colors.white : Colors.black87, fontSize: 16, height: 1.4),
+       child: Row(
+  mainAxisSize: MainAxisSize.min,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Expanded(
+      child: Text(
+        msg["text"],
+        style: TextStyle(
+          color: isUser ? Colors.white : Colors.black87,
+          fontSize: 16,
+          height: 1.4,
         ),
       ),
-    );
+    ),
+    if (!isUser)
+      SpeakerButton(
+        text: msg["text"],
+        size: 18,
+        color: Colors.grey[600],
+      ),
+  ],
+),
+    ));
   }
 
   Widget _buildInputArea() {
