@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:medimind/utils/global_data.dart';
 import '../../utils/app_colors.dart';
 import 'success_screen.dart';
-import '../../domain/models/medication.dart';
 import '../../data/repositories_impl/user_medication_repository_impl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../service/database/firestore_service.dart';
 import '../../domain/entities/user_medication_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:medimind/domain/models/medication.dart';
 
 /// screen to config the treatment duration and schedule with:
 /// - How long the treatment lasts (duration)
@@ -18,12 +18,15 @@ class TreatmentDurationScreen extends StatefulWidget {
   final String dosage;
   final String? notes;
   final Medication? medicationToEdit;
+  final bool isFromScanner;
 
-  const TreatmentDurationScreen({super.key, 
+  const TreatmentDurationScreen({
+    super.key,
     required this.medicationName,
     required this.dosage,
     this.notes,
     this.medicationToEdit,
+    this.isFromScanner = false,
   });
 
   @override
@@ -47,21 +50,20 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     if (widget.medicationToEdit != null) {
       final med = widget.medicationToEdit!;
       frequency = int.tryParse(med.frequency.split(" ")[0]) ?? 1;
-      
+
       // Parse times from instructions
       if (med.instructions.contains("Times:")) {
-        final timesStr = med.instructions.split("Times:")[1].split(".")[0].trim();
+        final timesStr =
+            med.instructions.split("Times:")[1].split(".")[0].trim();
         final times = timesStr.split(", ");
-        selectedTimes = times
-            .map((t) {
-              final parts = t.trim().split(":");
-              final hour = int.tryParse(parts[0]) ?? 8;
-              final minute = int.tryParse(parts[1].split(" ")[0]) ?? 0;
-              return TimeOfDay(hour: hour, minute: minute);
-            })
-            .toList();
+        selectedTimes = times.map((t) {
+          final parts = t.trim().split(":");
+          final hour = int.tryParse(parts[0]) ?? 8;
+          final minute = int.tryParse(parts[1].split(" ")[0]) ?? 0;
+          return TimeOfDay(hour: hour, minute: minute);
+        }).toList();
       }
-      
+
       // Calculate duration from start and end dates
       final daysDiff = med.endDate.difference(med.startDate).inDays + 1;
       if (daysDiff == 7) {
@@ -212,7 +214,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                     });
 
                     // Update local list
-                    final index = userAddedMeds.indexWhere((m) => m.id == med.id);
+                    final index =
+                        userAddedMeds.indexWhere((m) => m.id == med.id);
                     if (index != -1) {
                       userAddedMeds[index] = Medication(
                         id: med.id,
@@ -244,7 +247,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                       endDate: calculatedEndDate,
                       instructions: instructionsText,
                       isActive: true,
-                      aangemaaktViaOCR: false,
+                      aangemaaktViaOCR: widget.isFromScanner,
                       intakeTimes:
                           selectedTimes.map((t) => t.format(context)).toList(),
                       initialStock: 0,
@@ -274,8 +277,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => SuccessScreen(
-                          medicationName: widget.medicationName),
+                      builder: (context) =>
+                          SuccessScreen(medicationName: widget.medicationName),
                     ),
                   );
                 } catch (e) {
@@ -355,7 +358,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
             onPressed: () => _selectTime(index),
             child: Text(
               selectedTimes[index].format(context),
-              style: const TextStyle(fontSize: 18, color: AppColors.primaryBlue),
+              style:
+                  const TextStyle(fontSize: 18, color: AppColors.primaryBlue),
             ),
           ),
         );
