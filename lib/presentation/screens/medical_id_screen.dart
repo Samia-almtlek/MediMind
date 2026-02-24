@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../utils/app_colors.dart';
 import '../../auth/service/auth_service.dart';
@@ -8,7 +7,6 @@ import '../../auth/service/auth_service.dart';
 import '../../service/database/firestore_service.dart';
 import '../../data/repositories_impl/caregiver_repository_impl.dart';
 import '../../domain/entities/caregiver_entity.dart';
-import '../../core/widgets/speaker_button.dart';
 
 class MedicalIdScreen extends StatefulWidget {
   const MedicalIdScreen({super.key});
@@ -78,7 +76,7 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
         .get();
 
     if (snapshot.docs.isNotEmpty) {
-      final data = snapshot.docs.first.data()!;
+      final data = snapshot.docs.first.data();
       setState(() {
         _caregiverNameController.text = data['name'] ?? '';
         _caregiverEmailController.text = data['email'] ?? '';
@@ -171,7 +169,7 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
   Widget _buildBloodTypeDropdown() {
     return DropdownButtonFormField<String>(
-      value: selectedBloodType,
+      initialValue: selectedBloodType,
       decoration: _inputDecoration("Blood Type", Icons.bloodtype),
       items: bloodTypes
           .map((type) =>

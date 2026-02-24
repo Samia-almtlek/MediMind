@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
@@ -172,7 +171,7 @@ class _NotificationSettingsScreenState
         subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
         trailing: Switch(
           value: value,
-          activeColor: AppColors.primaryBlue,
+          activeThumbColor: AppColors.primaryBlue,
           onChanged: onChanged,
         ),
       ),

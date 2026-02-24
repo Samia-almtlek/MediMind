@@ -10,7 +10,6 @@ import 'presentation/screens/medications_screen.dart';
 import 'presentation/screens/medical_id_screen.dart';
 import 'presentation/screens/support_screen.dart';
 import 'presentation/screens/privacy_screen.dart';
-import 'presentation/screens/profile_screen.dart';
 import 'presentation/screens/notification_settings_screen.dart';
 import 'package:medimind/core/notification/notification_service.dart';
 import 'data/local_db/drug_loader.dart';
@@ -39,7 +38,7 @@ Future<void> main() async {
   // Add the following: the box for medical ID (we use a dynamic box for different types)
   await Hive.openBox('medical_id_data');
   // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
-  await Hive.openBox<Map>('medication_stock');
+  await Hive.openBox('medication_stock');
   await Hive.openBox('notification_settings'); // 🔒 NEW
 
   print('🗄️ Hive initialized successfully');
@@ -59,13 +58,13 @@ class MediMindApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // Set SplashScreen as the initial screen
-      home: AuthGate(),
+      home: const AuthGate(),
       routes: {
         '/signup': (context) => const RegisterScreen(),
-        '/medications': (context) => MedicationsScreen(),
-        '/medical_id': (context) => MedicalIdScreen(),
-        '/support': (context) => SupportScreen(),
-        '/privacy': (context) => PrivacyScreen(),
+        '/medications': (context) => const MedicationsScreen(),
+        '/medical_id': (context) => const MedicalIdScreen(),
+        '/support': (context) => const SupportScreen(),
+        '/privacy': (context) => const PrivacyScreen(),
         '/notifications': (context) => const NotificationSettingsScreen(),
       },
     );

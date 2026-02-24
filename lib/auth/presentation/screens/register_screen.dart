@@ -224,7 +224,7 @@ if (!_isValidEmail(_emailController.text.trim())) {
                         onPressed: () {
                           Navigator.pop(context);
                         },
-                        child: Text(
+                        child: const Text(
                           "Already have an account?",
                           style: TextStyle(
                             color: AppColors.primaryBlue,

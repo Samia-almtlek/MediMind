@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../service/database/firestore_service.dart';
 import '../../domain/entities/chat_message_entity.dart';
 import '../../domain/repositories/chat_message_repository.dart';
@@ -23,7 +22,7 @@ class ChatMessageRepositoryImpl
     return snapshot.docs
         .map((doc) =>
             ChatMessageModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 
