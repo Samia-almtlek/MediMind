@@ -167,6 +167,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                         notes: notesController.text.isNotEmpty
                             ? notesController.text
                             : null,
+                        medicationToEdit: widget.medicationToEdit,
                       ),
                     ),
                   );

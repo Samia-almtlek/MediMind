@@ -204,6 +204,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                         .collection('user_medications')
                         .doc(med.id)
                         .update({
+                      'name': widget.medicationName,
+                      'dosage': widget.dosage,
                       'frequencyPerDay': frequency,
                       'startDate': startDate,
                       'endDate': calculatedEndDate,
