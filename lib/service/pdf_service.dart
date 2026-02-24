@@ -2,6 +2,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/domain/models/medication.dart';
 
@@ -15,55 +16,23 @@ class PdfService {
     final pdf = pw.Document();
     final user = FirebaseAuth.instance.currentUser;
     final medicalBox = Hive.box('medical_id_data');
-    final stockBox = Hive.box('medication_stock');
-    final rawStockItems = stockBox.get('items', defaultValue: []);
-    final stockData = (rawStockItems as List)
-      .whereType<Map>()
-      .map((item) => Map<String, dynamic>.from(item))
-      .toList();
+    final stockData = await _loadStockDataFromFirestore(medications);
 
     final now = DateTime.now();
     final monthRef = reportMonth ?? now;
-    final monthStart = DateTime(monthRef.year, monthRef.month, 1);
-    final monthEnd = DateTime(monthRef.year, monthRef.month + 1, 0);
     final formattedDate =
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
     final formattedMonth = '${_monthName(monthRef.month)} ${monthRef.year}';
 
-    int totalTaken = 0;
-    int totalScheduled = 0;
-    final Map<String, int> monthlyTakenByMed = {};
-    final Map<int, int> weeklyTaken = {
-      1: 0,
-      2: 0,
-      3: 0,
-      4: 0,
-      5: 0,
-    };
+    final doseStats = await _computeDoseStatsFromLogs(
+      medications: medications,
+      monthRef: monthRef,
+    );
 
-    for (final med in medications) {
-      final monthCompletedDates = med.completedDates
-          .where((d) => d.year == monthRef.year && d.month == monthRef.month)
-          .toList();
-      final takenCount = monthCompletedDates.length;
-      monthlyTakenByMed[med.name] =
-          (monthlyTakenByMed[med.name] ?? 0) + takenCount;
-      totalTaken += takenCount;
-
-      for (final date in monthCompletedDates) {
-        final week = ((date.day - 1) ~/ 7) + 1;
-        weeklyTaken[week] = (weeklyTaken[week] ?? 0) + 1;
-      }
-
-      final frequencyPerDay = _parseFrequencyPerDay(med.frequency);
-      final activeDays = _activeDaysInRange(
-        med.startDate,
-        med.endDate,
-        monthStart,
-        monthEnd,
-      );
-      totalScheduled += activeDays * frequencyPerDay;
-    }
+    final totalTaken = doseStats.totalTaken;
+    final totalScheduled = doseStats.totalScheduled;
+    final monthlyTakenByMed = doseStats.monthlyTakenByMed;
+    final weeklyTaken = doseStats.weeklyTaken;
 
     final adherenceRate =
         totalScheduled > 0 ? (totalTaken / totalScheduled).clamp(0.0, 1.0) : 0.0;
@@ -89,7 +58,7 @@ class PdfService {
           padding: const pw.EdgeInsets.only(top: 8),
           child: pw.Text(
             'Page ${context.pageNumber} of ${context.pagesCount}',
-            style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
           ),
         ),
         build: (context) => [
@@ -103,9 +72,13 @@ class PdfService {
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
             headers: ['Medication', 'Dosage', 'Frequency'],
-            data: medications
-                .map((m) => [m.name, m.dosage, m.frequency])
-                .toList(),
+            data: medications.isEmpty
+                ? [
+                    ['No medication data found', '-', '-'],
+                  ]
+                : medications
+                    .map((m) => [m.name, m.dosage, m.frequency])
+                    .toList(),
           ),
           pw.SizedBox(height: 24),
 
@@ -164,6 +137,97 @@ class PdfService {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
+  static Future<_DoseStats> _computeDoseStatsFromLogs({
+    required List<Medication> medications,
+    required DateTime monthRef,
+  }) async {
+    final monthStart = DateTime(monthRef.year, monthRef.month, 1);
+    final monthEndInclusive = DateTime(monthRef.year, monthRef.month + 1, 0);
+    final monthEndExclusive = DateTime(monthRef.year, monthRef.month + 1, 1);
+    final startTs = Timestamp.fromDate(monthStart);
+    final endTs = Timestamp.fromDate(monthEndExclusive);
+
+    int totalTaken = 0;
+    int totalScheduled = 0;
+    final Map<String, int> monthlyTakenByMed = {};
+    final Map<int, int> weeklyTaken = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+
+    for (final med in medications) {
+      if (med.id.isEmpty) continue;
+
+      final frequencyPerDay = _parseFrequencyPerDay(med.frequency);
+
+      final scheduledSnapshot = await FirebaseFirestore.instance
+          .collection('user_medications')
+          .doc(med.id)
+          .collection('dose_logs')
+          .where('geplandeTijd', isGreaterThanOrEqualTo: startTs)
+          .where('geplandeTijd', isLessThan: endTs)
+          .get();
+
+          final scheduledFromLogs = scheduledSnapshot.docs.length;
+          totalScheduled += scheduledFromLogs;
+
+      int takenCountForMedication = 0;
+
+      for (final doseDoc in scheduledSnapshot.docs) {
+        final data = doseDoc.data();
+        if (data['status'] != 'taken') continue;
+
+        takenCountForMedication++;
+        totalTaken++;
+
+        final plannedTs = data['geplandeTijd'];
+        if (plannedTs is Timestamp) {
+          final plannedDate = plannedTs.toDate();
+          final week = ((plannedDate.day - 1) ~/ 7) + 1;
+          weeklyTaken[week] = (weeklyTaken[week] ?? 0) + 1;
+        }
+      }
+
+      if (scheduledFromLogs == 0) {
+        final activeDays = _activeDaysInRange(
+          med.startDate,
+          med.endDate,
+          monthStart,
+          monthEndInclusive,
+        );
+        final fallbackScheduled = activeDays * frequencyPerDay;
+
+        final monthCompletedDates = med.completedDates
+            .where((d) => d.year == monthRef.year && d.month == monthRef.month)
+            .toList();
+        final fallbackTaken = monthCompletedDates.length * frequencyPerDay;
+
+        totalScheduled += fallbackScheduled;
+        takenCountForMedication += fallbackTaken;
+        totalTaken += fallbackTaken;
+
+        for (final date in monthCompletedDates) {
+          final week = ((date.day - 1) ~/ 7) + 1;
+          weeklyTaken[week] =
+              (weeklyTaken[week] ?? 0) + frequencyPerDay;
+        }
+      }
+
+      monthlyTakenByMed[med.name] =
+          (monthlyTakenByMed[med.name] ?? 0) + takenCountForMedication;
+    }
+
+    return _DoseStats(
+      totalTaken: totalTaken,
+      totalScheduled: totalScheduled,
+      monthlyTakenByMed: monthlyTakenByMed,
+      weeklyTaken: weeklyTaken,
+    );
+  }
+
   static int _parseFrequencyPerDay(String frequency) {
     final match = RegExp(r'(\d+)').firstMatch(frequency);
     return int.tryParse(match?.group(1) ?? '1') ?? 1;
@@ -179,6 +243,35 @@ class PdfService {
     final end = medEnd.isBefore(rangeEnd) ? medEnd : rangeEnd;
     if (end.isBefore(start)) return 0;
     return end.difference(DateTime(start.year, start.month, start.day)).inDays + 1;
+  }
+
+  static Future<List<Map<String, dynamic>>> _loadStockDataFromFirestore(
+      List<Medication> medications) async {
+    final List<Map<String, dynamic>> rows = [];
+
+    for (final med in medications) {
+      if (med.id.isEmpty) continue;
+
+      final doc = await FirebaseFirestore.instance
+          .collection('user_medications')
+          .doc(med.id)
+          .get();
+
+      final data = doc.data() ?? const <String, dynamic>{};
+      final current = data['currentStock'];
+      final min = data['minStock'];
+
+      final currentStock = current is num ? current.toInt() : 0;
+      final minStock = min is num ? min.toInt() : 0;
+
+      rows.add({
+        'name': med.name,
+        'currentStock': currentStock,
+        'minStock': minStock,
+      });
+    }
+
+    return rows;
   }
 
   static String _monthName(int month) {
@@ -438,4 +531,18 @@ class PdfService {
       ],
     );
   }
+}
+
+class _DoseStats {
+  final int totalTaken;
+  final int totalScheduled;
+  final Map<String, int> monthlyTakenByMed;
+  final Map<int, int> weeklyTaken;
+
+  const _DoseStats({
+    required this.totalTaken,
+    required this.totalScheduled,
+    required this.monthlyTakenByMed,
+    required this.weeklyTaken,
+  });
 }
