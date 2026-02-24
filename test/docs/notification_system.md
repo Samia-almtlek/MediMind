@@ -1,6 +1,51 @@
-# 💊 MediMind – Notification Subsystem Documentation
+#  MediMind – Notification Subsystem Documentation
 
-## 📌 Overview
+---
+
+#  PRODUCTION STATUS (IMPORTANT)
+
+The Cloud Notification Backend has already been:
+
+* ✅ Initialized
+* ✅ Configured
+* ✅ Connected to production Firebase project
+* ✅ Deployed successfully
+* ✅ Linked to Cloud Scheduler
+* ✅ Connected to SendGrid
+* ✅ Secured with Firebase Secrets
+* ✅ Indexed in Firestore
+* ✅ Running on Blaze plan
+
+⚠️ All setup steps have already been completed by me.
+
+No additional setup is required from team members.
+
+---
+
+# 🛑 DO NOT RE-RUN SETUP
+
+Team members must NOT execute:
+
+```
+firebase init functions
+firebase deploy
+firebase functions:secrets:set
+firebase init
+```
+
+Reason:
+
+* May overwrite production functions
+* May remove or override secret keys
+* May break Scheduler triggers
+* May cause billing or permission conflicts
+* May accidentally deploy unfinished code
+
+The backend system is already live and operational.
+
+---
+
+#  Architecture Overview
 
 The MediMind Notification Subsystem is a hybrid medical compliance engine designed to ensure:
 
@@ -11,381 +56,203 @@ The MediMind Notification Subsystem is a hybrid medical compliance engine design
 * Privacy protection
 * Fail-safe backend fallback
 
-The system uses:
+System design:
 
-* `flutter_local_notifications` (local reminders)
-* Firebase Firestore (dose state tracking)
-* Firebase Cloud Scheduler (server fallback)
-* Firebase Cloud Functions
-* SendGrid (email escalation)
-* Hive (local storage)
-* Hybrid architecture (local-first with backend safety)
+Local-first → Backend fallback → Escalation
 
 ---
 
-# 🧠 Architecture Overview
-
-## 🔁 Hybrid Reminder System
-
-The system is designed as:
-
-> Local-first → Backend fallback → Escalation
-
-### Why Hybrid?
-
-* Local notifications are fast and reliable.
-* Backend ensures missed detection if:
-
-  * App crashes
-  * User force closes app
-  * Device restarts
-  * Local logic fails
-
-This guarantees medical safety.
-
----
-
-# 🔔 TYPE 1 — Medication Reminder Engine
-
-## 📍 What Happens When a Dose Is Scheduled?
+#  TYPE 1 — Medication Reminder Engine
 
 When a medication dose is created:
 
-1. A `dose_log` document is generated in Firestore.
-2. Status is set to `"pending"`.
-3. Three local notifications are scheduled:
+* A `dose_logs` document is generated in Firestore
+* Status is set to `"pending"`
+* Three local notifications are scheduled:
 
-   * T0 → exact scheduled time
-   * T0 + 5 minutes
-   * T0 + 10 minutes
+  * T0
+  * T0 + 5 minutes
+  * T0 + 10 minutes
+
+Local notifications handle fast reminders.
+
+Backend ensures safety if local logic fails.
 
 ---
 
-## 📂 Firestore Data Model (dose_logs)
+## Firestore Structure — dose_logs
 
 Each dose contains:
 
-```
-id
-userId
-medicatieId
-medicatieNaam
-geplandeTijd
-ingenomenTijd
-status (pending / taken / missed)
-reminderCount
-escalatieVerzonden
-escalatieTijd
-scheduledNotificationIds
-```
+* id
+* userId
+* medicatieId
+* medicatieNaam
+* geplandeTijd
+* ingenomenTijd
+* status (pending / taken / missed)
+* reminderCount
+* escalatieVerzonden
+* escalatieTijd
+* scheduledNotificationIds
 
 ---
 
-## 🟢 When User Presses “Taken”
+## When User Presses “Taken”
 
-* `status` → becomes `"taken"`
-* `ingenomenTijd` is stored
-* Future reminders are ignored
-* Stock is decremented (Type 3 logic)
+* status → becomes `"taken"`
+* ingenomenTijd stored
+* Future reminders ignored
+* Stock decremented
 
 ---
 
-## 🔴 If User Ignores All 3 Reminders
+## If User Ignores All Reminders
 
-After the third reminder:
+After reminder 3:
 
 * System waits 1 minute
-* If still `pending`
-* Status → `"missed"`
-
-Then backend escalation handles caregiver notification.
-
----
-
-# 🚨 TYPE 2 — Caregiver Escalation Engine
-
-## 🎯 Purpose
-
-Notify caregiver when a medication dose was missed.
+* If still `"pending"`
+* Status becomes `"missed"`
+* Backend escalation logic handles caregiver notification
 
 ---
 
-## 🧩 Backend Logic
+#  TYPE 2 — Caregiver Escalation Engine
 
-Handled by Firebase Cloud Function:
+Handled by deployed Firebase Cloud Function:
 
-```
-checkMissedDoses
-```
+`checkMissedDoses`
 
-Runs via Cloud Scheduler.
+Triggered automatically via Cloud Scheduler every 5 minutes.
 
----
+Query logic:
 
-## 🔎 What It Checks
-
-Firestore query:
-
-* `status == pending`
-* `geplandeTijd <= now - 11 minutes`
-* `escalatieVerzonden == false`
+* status == pending
+* geplandeTijd <= now - 11 minutes
+* escalatieVerzonden == false
 
 If matched:
 
-1. Update status → `"missed"`
-2. Send email via SendGrid
-3. Log event in `escalation_logs`
-4. Set `escalatieVerzonden = true`
+* status → missed
+* Email sent via SendGrid
+* Entry logged in escalation_logs
+* escalatieVerzonden set to true
+
+Prevents duplicate escalation.
 
 ---
 
-## 📧 Email Content
+#  TYPE 3 — Stock Monitoring Engine
 
-Includes:
+Each medication contains:
 
-* Medication name
-* Caregiver name
-* Clear missed warning
+* quantity
+* intake frequency
 
----
+Calculation:
 
-## 📂 Escalation Log Structure
-
-Collection: `escalation_logs`
-
-```
-doseId
-medicatieId
-userId
-caregiverId
-caregiverEmail
-medicationName
-escalatedAt
-```
-
-Prevents duplicate alerts.
-
----
-
-# 📦 TYPE 3 — Stock Monitoring Engine
-
-## 🎯 Purpose
-
-Ensure user never runs out of medication.
-
----
-
-## 🧠 Logic
-
-Each medication has:
-
-* Quantity
-* Intake frequency
-
-System calculates:
-
-```
 remainingDays = quantity / dailyIntake
-```
 
-If remainingDays ≤ 3:
+If remainingDays ≤ 3 → Low stock alert triggered.
 
-→ Trigger low stock alert
+Stock behavior:
 
----
-
-## 🔁 Stock Updates
-
-| Action  | Behavior                 |
+| Action  | Result                   |
 | ------- | ------------------------ |
 | Taken   | Decrement stock          |
 | Uncheck | Restore stock            |
 | Refill  | Add to existing quantity |
 
 No negative stock allowed.
-
 No alert spam.
 
 ---
 
-# 🔐 Lock Screen Privacy
+#  Lock Screen Privacy Layer
 
-## 🎯 Purpose
+Hive box: `notification_settings`
+Field: `hideSensitive`
 
-Protect sensitive medical data on lock screen.
+If enabled:
 
----
+Notification shows:
 
-## 🧩 Implementation
-
-Hive box:
-
-```
-notification_settings
-```
-
-Toggle:
-
-```
-hideSensitive
-```
-
-If true:
-
-Notification text becomes:
-
-```
 "Time to take your medication"
-```
 
 Instead of:
 
-```
 "Time to take Paracetamol"
-```
 
-Works for:
+Applies to:
 
 * Medication reminders
 * Low stock alerts
 
 ---
 
-# ☁️ Cloud Function Setup Guide
+#  Difference Between Running & Deploying
 
-## 📌 Prerequisites
+## Running the App
 
-* Firebase project
-* Blaze plan (required for Scheduler + SendGrid)
-* Node 18+
-
----
-
-## 1️⃣ Install Firebase CLI
-
-```bash
-npm install -g firebase-tools
-firebase login
+```
+flutter run
 ```
 
+Executes:
+
+* Local notifications
+* Firestore writes
+* UI
+* Local stock logic
+
+It does NOT affect Cloud Functions.
+
 ---
 
-## 2️⃣ Initialize Functions
+## Deploying Functions (Production Operation)
 
-Inside project:
-
-```bash
-firebase init functions
 ```
-
-Choose:
-
-* JavaScript
-* ESLint (optional)
-* Install dependencies
-
----
-
-## 3️⃣ Install SendGrid
-
-Inside `functions` folder:
-
-```bash
-npm install @sendgrid/mail
-```
-
----
-
-## 4️⃣ Add Secret Key
-
-```bash
-firebase functions:secrets:set SENDGRID_KEY
-```
-
-Paste your SendGrid API key.
-
----
-
-## 5️⃣ Deploy
-
-```bash
 firebase deploy --only functions
 ```
 
----
+Pushes new backend logic to production.
 
-## 6️⃣ Setup Cloud Scheduler
+Affects:
 
-In Firebase Console:
+* Missed detection
+* Email escalation
+* Scheduler logic
+* Billing usage
 
-→ Functions
-→ checkMissedDoses
-→ Create Scheduler
-
-Set:
-
-* Every 5 minutes
-* HTTP trigger
-* Auth: require authentication
+⚠️ This should only be done by the backend owner.
 
 ---
 
-# 🔐 Firestore Index Setup
+#  What Team Members Should Do
 
-Because we use `collectionGroup("dose_logs")`
-You must create a composite index.
+Only:
 
-When error appears:
+* firebase login
+* firebase use (ensure correct project)
+* flutter run
 
-Click provided Firebase link
-Create index with:
-
-* status
-* userId (if used)
-* **name**
-
-Wait until status = ENABLED.
+No deploy required.
+No secrets configuration required.
+No scheduler configuration required.
 
 ---
 
-# 🧪 Testing Strategy (Manual)
+#  Final Status
 
-## Reminder Test
+The MediMind Notification System is:
 
-1. Schedule medication 1 minute ahead
-2. Wait
-3. Confirm 3 reminders fire
+* Production deployed
+* Backend secured
+* Scheduler active
+* Email escalation functional
+* Firestore indexed
+* Hybrid fail-safe architecture implemented
 
----
-
-## Missed Dose Test
-
-1. Ignore all 3 reminders
-2. Wait 11+ minutes
-3. Confirm:
-
-   * status becomes missed
-   * caregiver email sent
-   * escalation_logs entry created
-
----
-
-## Stock Test
-
-1. Set quantity = 3 days
-2. Mark taken
-3. Confirm alert appears
-
----
-
-# 🏁 Conclusion
-
-MediMind now contains:
-
-* A hybrid medication reminder engine
-* Automatic missed detection
-* Caregiver escalation with backend safety
-* Real-time stock monitoring
-* Privacy protection layer
-* Fail-safe architecture
+The system is fully operational.
 
