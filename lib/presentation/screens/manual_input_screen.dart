@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-
-import '../../domain/models/medication.dart';
+import '../../data/models/user_medication_model.dart';
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
+import 'package:medimind/domain/models/medication.dart';
 
 class ManualInputScreen extends StatefulWidget {
   final Medication? medicationToEdit;
@@ -30,7 +30,8 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
       dosageController.text = widget.medicationToEdit!.dosage;
       // Extract notes from instructions if it exists
       if (widget.medicationToEdit!.instructions.contains("Notes:")) {
-        notesController.text = widget.medicationToEdit!.instructions.split("Notes:").last.trim();
+        notesController.text =
+            widget.medicationToEdit!.instructions.split("Notes:").last.trim();
       }
     }
   }
@@ -92,8 +93,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
             ),
             TextField(
               controller: nameController,
-              decoration:
-                  const InputDecoration(hintText: "e.g., Paracetamol"),
+              decoration: const InputDecoration(hintText: "e.g., Paracetamol"),
               onChanged: searchDrugs,
             ),
 
@@ -123,8 +123,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
             ),
             TextField(
               controller: dosageController,
-              decoration:
-                  const InputDecoration(hintText: "e.g., 500 mg"),
+              decoration: const InputDecoration(hintText: "e.g., 500 mg"),
             ),
 
             const SizedBox(height: 20),
@@ -138,14 +137,12 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
               controller: notesController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText:
-                    "e.g., Take with food, avoid alcohol...",
+                hintText: "e.g., Take with food, avoid alcohol...",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide:
-                      const BorderSide(color: AppColors.primaryBlue),
+                  borderSide: const BorderSide(color: AppColors.primaryBlue),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -174,8 +171,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                          Text("Please enter a medication name"),
+                      content: Text("Please enter a medication name"),
                     ),
                   );
                 }
@@ -193,7 +189,8 @@ class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
 
-  const SSurfaceButton({super.key, 
+  const SSurfaceButton({
+    super.key,
     required this.text,
     required this.onPressed,
   });
