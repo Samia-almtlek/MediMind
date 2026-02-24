@@ -28,40 +28,38 @@ class UserMedicationModel extends UserMedicationEntity {
   /// ==========================
 
   factory UserMedicationModel.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> doc) {
+      DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
 
-  final data = doc.data();
+    if (data == null) {
+      throw Exception("UserMedication document is null: ${doc.id}");
+    }
 
-  if (data == null) {
-    throw Exception("UserMedication document is null: ${doc.id}");
+    return UserMedicationModel(
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      productId: data['productId'] ?? '',
+      name: data['name'] ?? '',
+      dosage: data['dosage'] ?? '',
+      frequencyPerDay: data['frequencyPerDay'] ?? 1,
+      startDate: data['startDate'] != null
+          ? (data['startDate'] as Timestamp).toDate()
+          : DateTime.now(),
+      endDate: data['endDate'] != null
+          ? (data['endDate'] as Timestamp).toDate()
+          : null,
+      instructions: data['instructions'] ?? '',
+      isActive: data['isActive'] ?? true,
+      aangemaaktViaOCR: data['aangemaaktViaOCR'] ?? false,
+      intakeTimes: List<String>.from(data['intakeTimes'] ?? []),
+      initialStock: data['initialStock'] ?? 0,
+      currentStock: data['currentStock'] ?? 0,
+      lowStockThresholdDays: data['lowStockThresholdDays'] ?? 3,
+      lastStockAlertAt: data['lastStockAlertAt'] != null
+          ? (data['lastStockAlertAt'] as Timestamp).toDate()
+          : null,
+    );
   }
-
-  return UserMedicationModel(
-    id: doc.id,
-    userId: data['userId'] ?? '',
-    productId: data['productId'] ?? '',
-    name: data['name'] ?? '',
-    dosage: data['dosage'] ?? '',
-    frequencyPerDay: data['frequencyPerDay'] ?? 1,
-    startDate: data['startDate'] != null
-        ? (data['startDate'] as Timestamp).toDate()
-        : DateTime.now(),
-    endDate: data['endDate'] != null
-        ? (data['endDate'] as Timestamp).toDate()
-        : null,
-    instructions: data['instructions'] ?? '',
-    isActive: data['isActive'] ?? true,
-    aangemaaktViaOCR: data['aangemaaktViaOCR'] ?? false,
-    intakeTimes: List<String>.from(data['intakeTimes'] ?? []),
-
-    initialStock: data['initialStock'] ?? 0,
-    currentStock: data['currentStock'] ?? 0,
-    lowStockThresholdDays: data['lowStockThresholdDays'] ?? 3,
-    lastStockAlertAt: data['lastStockAlertAt'] != null
-        ? (data['lastStockAlertAt'] as Timestamp).toDate()
-        : null,
-  );
-}
 
   /// ==========================
   /// TO FIRESTORE
@@ -75,8 +73,7 @@ class UserMedicationModel extends UserMedicationEntity {
       'dosage': dosage,
       'frequencyPerDay': frequencyPerDay,
       'startDate': Timestamp.fromDate(startDate),
-      'endDate':
-          endDate != null ? Timestamp.fromDate(endDate!) : null,
+      'endDate': endDate != null ? Timestamp.fromDate(endDate!) : null,
       'instructions': instructions,
       'isActive': isActive,
       'aangemaaktViaOCR': aangemaaktViaOCR,
@@ -96,8 +93,7 @@ class UserMedicationModel extends UserMedicationEntity {
   /// FROM ENTITY
   /// ==========================
 
-  factory UserMedicationModel.fromEntity(
-      UserMedicationEntity entity) {
+  factory UserMedicationModel.fromEntity(UserMedicationEntity entity) {
     return UserMedicationModel(
       id: entity.id,
       userId: entity.userId,
