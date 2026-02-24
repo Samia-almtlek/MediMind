@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../service/database/firestore_service.dart';
 import '../../domain/entities/medicatie_schema_entity.dart';
 import '../../domain/repositories/medicatie_schema_repository.dart';
@@ -22,7 +21,7 @@ class MedicatieSchemaRepositoryImpl
     return snapshot.docs
         .map((doc) =>
             MedicatieSchemaModel.fromFirestore(
-                doc as QueryDocumentSnapshot<Map<String, dynamic>>))
+                doc))
         .toList();
   }
 

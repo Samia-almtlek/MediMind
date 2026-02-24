@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../domain/models/medication.dart';
 
 class ScheduleScreen extends StatelessWidget {
+  const ScheduleScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     // Process the global list to split multiple times into individual entries
@@ -16,7 +18,7 @@ class ScheduleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Treatment Plan",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
@@ -80,7 +82,7 @@ class ScheduleScreen extends StatelessWidget {
 
   Widget _buildGroupedTreatmentList(Map<String, List<Medication>> groupedMeds) {
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: groupedMeds.keys.length,
       itemBuilder: (context, index) {
         String month = groupedMeds.keys.elementAt(index);
@@ -94,13 +96,13 @@ class ScheduleScreen extends StatelessWidget {
                   const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
               child: Text(
                 month,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.iconGrey),
               ),
             ),
-            ...medsInMonth.map((med) => _buildTreatmentCard(med)).toList(),
+            ...medsInMonth.map((med) => _buildTreatmentCard(med)),
           ],
         );
       },
@@ -121,8 +123,8 @@ class ScheduleScreen extends StatelessWidget {
     final bool isActive = !isDatePassed && !isFullyCompleted;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -130,37 +132,37 @@ class ScheduleScreen extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.lightTeal.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.access_time_filled, color: AppColors.primaryBlue),
+            child: const Icon(Icons.access_time_filled, color: AppColors.primaryBlue),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   med.name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   "Dosage: ${med.dosage}",
                   style: TextStyle(color: Colors.grey[600]),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   "Scheduled for: ${med.time}",
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
                   ),
@@ -176,7 +178,7 @@ class ScheduleScreen extends StatelessWidget {
 
   Widget _buildStatusBadge(bool isActive) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: isActive ? Colors.green[50] : Colors.red[50],
         borderRadius: BorderRadius.circular(20),
@@ -203,8 +205,8 @@ class ScheduleScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.history_edu, size: 80, color: Colors.grey[300]),
-          SizedBox(height: 16),
-          Text(
+          const SizedBox(height: 16),
+          const Text(
             "No active treatment plans",
             style: TextStyle(
                 fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),

@@ -4,7 +4,6 @@ import 'package:medimind/presentation/screens/main_screen.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../service/auth_service.dart';
-import '../presentation/screens/register_screen.dart';
 import '../presentation/screens/login_screen.dart';
 
 /// AuthGate decides which screen to show
@@ -91,13 +90,13 @@ class _AuthGateState extends State<AuthGate> {
           final user = snapshot.data!;
 
           if (user.emailVerified) {
-            return MainScreen();
+            return const MainScreen();
           } else {
-            return LoginScreen();
+            return const LoginScreen();
           }
         }
 
-        return LoginScreen();
+        return const LoginScreen();
       },
     );
   }

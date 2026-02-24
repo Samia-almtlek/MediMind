@@ -4,7 +4,7 @@ import '../../utils/app_colors.dart';
 class SuccessScreen extends StatelessWidget {
   final String medicationName;
 
-  SuccessScreen({required this.medicationName});
+  const SuccessScreen({super.key, required this.medicationName});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +16,7 @@ class SuccessScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Groot groen vinkje icoon
+              // a circular container with check 
               Container(
                 width: 100,
                 height: 100,
@@ -24,24 +24,24 @@ class SuccessScreen extends StatelessWidget {
                   color: AppColors.lightTeal.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.check_circle,
                   color: AppColors.primaryBlue,
                   size: 80,
                 ),
               ),
-              SizedBox(height: 30),
-              Text(
+              const SizedBox(height: 30),
+              const Text(
                 "Great!",
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Text(
                 "$medicationName has been successfully added to your schedule.",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
-              SizedBox(height: 50),
+              const SizedBox(height: 50),
         
               SizedBox(
                 width: double.infinity,
@@ -57,7 +57,7 @@ class SuccessScreen extends StatelessWidget {
                     // this clears all screens in the 'stack' and goes back to the home page
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },
-                  child: Text(
+                  child: const Text(
                     "Back to Home",
                     style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
