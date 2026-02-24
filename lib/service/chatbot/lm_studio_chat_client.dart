@@ -23,6 +23,7 @@ class LmStudioChatClient {
     required Uri endpoint,
     required String model,
     required String authorizedContext,
+    String? extraContext,
     required String question,
   }) async {
     final response = await _httpClient.post(
@@ -45,6 +46,7 @@ class LmStudioChatClient {
             'role': 'user',
             'content': buildBoundedUserPrompt(
               authorizedContext: authorizedContext,
+              extraContext: extraContext,
               question: question,
             ),
           },

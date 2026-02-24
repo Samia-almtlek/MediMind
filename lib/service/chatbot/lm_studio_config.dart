@@ -16,7 +16,7 @@ class LmStudioConfig {
       return null;
     }
 
-    final trimmed = configuredBaseUrl.replaceAll(RegExp(r'\/+\$'), '');
+    final trimmed = configuredBaseUrl.replaceAll(RegExp(r'/+$'), '');
 
     if (trimmed.endsWith('/v1/chat/completions')) {
       return Uri.tryParse(trimmed);

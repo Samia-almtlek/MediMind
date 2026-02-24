@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:medimind/service/chatbot/authorized_context_provider.dart';
 import 'package:medimind/service/chatbot/chat_memory_service.dart';
@@ -18,6 +19,8 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const int _minAuthorizedLengthToDisableExtra = 120;
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final AuthorizedContextProvider _contextProvider;
@@ -36,6 +39,81 @@ class _ChatScreenState extends State<ChatScreen> {
       "time": DateTime.now(),
     },
   ];
+
+  void _logMemoryError(String scope, Object error, [StackTrace? stackTrace]) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[ChatMemory][$scope] $error');
+    if (stackTrace != null) {
+      debugPrint(stackTrace.toString());
+    }
+  }
+
+  String? _extractDrugName(String authorizedContext) {
+    final lines = authorizedContext
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty);
+    for (final line in lines) {
+      if (line.toUpperCase().startsWith('DRUG:')) {
+        return line.substring(5).trim();
+      }
+    }
+    return null;
+  }
+
+  String _buildRetryQuestion({
+    required String originalQuestion,
+    required String authorizedContext,
+  }) {
+    final drug = _extractDrugName(authorizedContext);
+    final q = originalQuestion.trim();
+    final lower = q.toLowerCase();
+
+    if (drug != null &&
+        (lower.contains('tell me about') || lower.startsWith('what is '))) {
+      return 'Using only BEGIN_CONTEXT, give a concise overview of $drug, including use and key risks.';
+    }
+
+    if (drug != null &&
+        (lower.contains('risk') ||
+            lower.contains('side effect') ||
+            lower.contains('danger'))) {
+      return 'Using only BEGIN_CONTEXT, what are the risks and side effects of $drug?';
+    }
+
+    return 'Using only BEGIN_CONTEXT, answer this question: $q';
+  }
+
+  String _buildFollowUpHint(String conversationContext) {
+    final lines = conversationContext
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList()
+        .reversed;
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('user:')) {
+        return line;
+      }
+    }
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('assistant:')) {
+        return line;
+      }
+    }
+
+    if (conversationContext.length <= 300) {
+      return conversationContext;
+    }
+
+    return conversationContext.substring(conversationContext.length - 300);
+  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,6 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _contextProvider = FirestoreProductDescriptionContextProvider(
       FirebaseFirestore.instance,
       fallbackProvider: LocalDrugListContextProvider(),
+      maxProductsToScan: 2000,
     );
     _initializeSession();
   }
@@ -67,13 +146,36 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeSession() async {
     try {
       final sessionId = await _chatMemoryService.ensureSessionId();
+      final persistedMessages =
+          await _chatMemoryService.getSessionMessages(sessionId);
+
+      final mappedMessages = persistedMessages
+          .map(
+            (message) => {
+              'text': message.content,
+              'isUser': message.isUser,
+              'time': message.time,
+            },
+          )
+          .toList();
+
       if (!mounted) {
         return;
       }
+
       setState(() {
         _sessionId = sessionId;
+        if (mappedMessages.isNotEmpty) {
+          _messages
+            ..clear()
+            ..addAll(mappedMessages);
+        }
       });
-    } catch (_) {}
+
+      _scrollToBottom();
+    } catch (error, stackTrace) {
+      _logMemoryError('initializeSession', error, stackTrace);
+    }
   }
 
   Future<String> _getOrCreateSessionId() async {
@@ -114,49 +216,117 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
-      final sessionId = await _getOrCreateSessionId();
+      String authorizedContext = '';
+      try {
+        authorizedContext =
+            await _contextProvider.buildAuthorizedContext(userText);
+        if (kDebugMode) {
+          debugPrint(
+            '[AuthorizedContext][length=${authorizedContext.length}] '
+            '${authorizedContext.length > 120 ? '${authorizedContext.substring(0, 120)}...' : authorizedContext}',
+          );
+        }
+      } catch (error, stackTrace) {
+        _logMemoryError('authorizedContext', error, stackTrace);
+      }
 
-      final conversationContext =
-          await _chatMemoryService.buildConversationContext(sessionId);
+      String conversationContext = '';
+      String? sessionId;
+      try {
+        sessionId = await _getOrCreateSessionId();
+      } catch (error, stackTrace) {
+        _logMemoryError('getOrCreateSession', error, stackTrace);
+      }
 
-      final authorizedContext =
-          await _contextProvider.buildAuthorizedContext(userText);
+      if (sessionId != null) {
+        try {
+        await _chatMemoryService.saveMessage(
+          sessionId: sessionId,
+          sender: 'user',
+          content: userText,
+        );
+        } catch (error, stackTrace) {
+          _logMemoryError('saveUserMessage', error, stackTrace);
+        }
 
-      await _chatMemoryService.saveMessage(
-        sessionId: sessionId,
-        sender: 'user',
-        content: userText,
-      );
+        try {
+          conversationContext =
+              await _chatMemoryService.buildConversationContext(sessionId);
+        } catch (error, stackTrace) {
+          _logMemoryError('buildConversationContext', error, stackTrace);
+        }
+      }
 
-      final combinedContext = [
-        if (authorizedContext.trim().isNotEmpty) authorizedContext.trim(),
-        if (conversationContext.trim().isNotEmpty) conversationContext.trim(),
-      ].join('\n\n');
+      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+        try {
+          final followUpHint = _buildFollowUpHint(conversationContext);
+          final hintedAuthorizedContext = await _contextProvider
+              .buildAuthorizedContext('$userText\n$followUpHint');
+
+          if (hintedAuthorizedContext.trim().isNotEmpty) {
+            authorizedContext = hintedAuthorizedContext;
+            if (kDebugMode) {
+              debugPrint('[AuthorizedContext] Resolved via follow-up hint: $followUpHint');
+            }
+          }
+        } catch (error, stackTrace) {
+          _logMemoryError('authorizedContextFollowUpHint', error, stackTrace);
+        }
+      }
+
+      final trimmedAuthorizedContext = authorizedContext.trim();
+      final shouldIncludeExtraContext =
+          trimmedAuthorizedContext.length < _minAuthorizedLengthToDisableExtra;
+      final extraContextForRequest =
+          shouldIncludeExtraContext ? conversationContext : '';
 
       response = await _chatClient.complete(
         endpoint: endpoint,
         model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
-        authorizedContext: combinedContext,
+        authorizedContext: authorizedContext,
+        extraContext: extraContextForRequest,
         question: userText,
       );
 
-      await _chatMemoryService.saveMessage(
-        sessionId: sessionId,
-        sender: 'bot',
-        content: response,
-      );
+      if (trimmedAuthorizedContext.isNotEmpty &&
+          response.trim() == kRefusalResponse) {
+        final retryQuestion = _buildRetryQuestion(
+          originalQuestion: userText,
+          authorizedContext: trimmedAuthorizedContext,
+        );
 
-      await _chatMemoryService.updateSummary(
-        sessionId: sessionId,
-        userMessage: userText,
-        assistantMessage: response,
-      );
+        response = await _chatClient.complete(
+          endpoint: endpoint,
+          model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+          authorizedContext: authorizedContext,
+          extraContext: '',
+          question: retryQuestion,
+        );
+      }
+
+      if (sessionId != null) {
+        try {
+          await _chatMemoryService.saveMessage(
+            sessionId: sessionId,
+            sender: 'bot',
+            content: response,
+          );
+
+          await _chatMemoryService.updateSummary(
+            sessionId: sessionId,
+            userMessage: userText,
+            assistantMessage: response,
+          );
+        } catch (error, stackTrace) {
+          _logMemoryError('saveBotMessageOrSummary', error, stackTrace);
+        }
+      }
     } on LmStudioException catch (error) {
       response =
           'I cannot complete this request right now: ${error.message}';
-    } catch (_) {
+    } catch (error) {
       response =
-          'I cannot complete this request right now. Please verify LM Studio is running and reachable.';
+          'I cannot complete this request right now: ${error.runtimeType}. Please verify LM Studio is running and reachable.';
     }
 
     if (!mounted) {

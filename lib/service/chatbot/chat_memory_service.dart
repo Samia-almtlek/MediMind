@@ -1,6 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+const String _refusalMarker =
+  'cannot answer this question with certainty';
+
+class ChatMemoryMessage {
+  const ChatMemoryMessage({
+    required this.isUser,
+    required this.content,
+    required this.time,
+  });
+
+  final bool isUser;
+  final String content;
+  final DateTime time;
+}
+
 class ChatMemoryService {
   ChatMemoryService({
     required FirebaseFirestore firestore,
@@ -11,24 +26,26 @@ class ChatMemoryService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
+  static String? _activeSessionId;
+
   CollectionReference<Map<String, dynamic>> get _sessions =>
       _firestore.collection('chat_sessions');
   CollectionReference<Map<String, dynamic>> get _messages =>
       _firestore.collection('chat_messages');
 
   Future<String> ensureSessionId() async {
-    final userId = _auth.currentUser?.uid ?? 'anonymous';
-
-    final existing = await _sessions
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(1)
-        .get();
-
-    if (existing.docs.isNotEmpty) {
-      return existing.docs.first.id;
+    final existingActiveSessionId = _activeSessionId;
+    if (existingActiveSessionId != null && existingActiveSessionId.isNotEmpty) {
+      return existingActiveSessionId;
     }
 
+    final userId = _auth.currentUser?.uid ?? 'anonymous';
+    final createdSessionId = await _createSession(userId);
+    _activeSessionId = createdSessionId;
+    return createdSessionId;
+  }
+
+  Future<String> _createSession(String userId) async {
     final now = Timestamp.now();
     final created = await _sessions.add({
       'userId': userId,
@@ -79,11 +96,25 @@ class ChatMemoryService {
 
     final query = await _messages
         .where('sessionId', isEqualTo: sessionId)
-        .orderBy('timestamp', descending: true)
-        .limit(maxMessages)
+      .limit(maxMessages * 4)
         .get();
 
-    final recent = query.docs.reversed.toList();
+    final sorted = query.docs.toList()
+      ..sort((a, b) {
+      final aTs = a.data()['timestamp'];
+      final bTs = b.data()['timestamp'];
+      final aDate = aTs is Timestamp
+        ? aTs.toDate()
+        : DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = bTs is Timestamp
+        ? bTs.toDate()
+        : DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+      });
+
+    final trimmedDescending =
+      sorted.length <= maxMessages ? sorted : sorted.take(maxMessages).toList();
+    final recent = trimmedDescending.reversed.toList();
 
     final lines = <String>[];
 
@@ -119,13 +150,25 @@ class ChatMemoryService {
     final sessionDoc = await _sessions.doc(sessionId).get();
     final sessionData = sessionDoc.data();
     final existingSummary = (sessionData?['summary'] as String?)?.trim() ?? '';
+    final sanitizedSummary = _removeRefusalEntries(existingSummary);
+
+    if (_isRefusal(assistantMessage)) {
+      await _sessions.doc(sessionId).set(
+        {
+          'summary': sanitizedSummary,
+          'summaryUpdatedAt': Timestamp.now(),
+        },
+        SetOptions(merge: true),
+      );
+      return;
+    }
 
     final nextChunk =
         'USER: ${userMessage.trim()} | ASSISTANT: ${assistantMessage.trim()}';
 
-    final merged = existingSummary.isEmpty
+    final merged = sanitizedSummary.isEmpty
         ? nextChunk
-        : '$existingSummary\n$nextChunk';
+        : '$sanitizedSummary\n$nextChunk';
 
     final bounded = merged.length <= maxLength
         ? merged
@@ -138,5 +181,84 @@ class ChatMemoryService {
       },
       SetOptions(merge: true),
     );
+  }
+
+  bool _isRefusal(String text) {
+    final normalized = text.toLowerCase();
+    return normalized.contains(_refusalMarker);
+  }
+
+  String _removeRefusalEntries(String summary) {
+    if (summary.trim().isEmpty) {
+      return '';
+    }
+
+    final lines = summary
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    final kept = <String>[];
+    for (final line in lines) {
+      if (_isRefusal(line)) {
+        continue;
+      }
+      kept.add(line);
+    }
+
+    return kept.join('\n');
+  }
+
+  Future<List<ChatMemoryMessage>> getSessionMessages(
+    String sessionId, {
+    int maxMessages = 80,
+  }) async {
+    final query = await _messages
+        .where('sessionId', isEqualTo: sessionId)
+        .limit(maxMessages * 4)
+        .get();
+
+    final sorted = query.docs.toList()
+      ..sort((a, b) {
+        final aTs = a.data()['timestamp'];
+        final bTs = b.data()['timestamp'];
+        final aDate = aTs is Timestamp
+            ? aTs.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final bDate = bTs is Timestamp
+            ? bTs.toDate()
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        return aDate.compareTo(bDate);
+      });
+
+    final docs = sorted.length <= maxMessages
+        ? sorted
+        : sorted.sublist(sorted.length - maxMessages);
+    final messages = <ChatMemoryMessage>[];
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final content = (data['content'] as String?)?.trim();
+      final sender = (data['sender'] as String?)?.toLowerCase().trim();
+      final timestamp = data['timestamp'];
+
+      if (content == null || content.isEmpty) {
+        continue;
+      }
+
+      final createdAt =
+          timestamp is Timestamp ? timestamp.toDate() : DateTime.now();
+
+      messages.add(
+        ChatMemoryMessage(
+          isUser: sender == 'user',
+          content: content,
+          time: createdAt,
+        ),
+      );
+    }
+
+    return messages;
   }
 }
