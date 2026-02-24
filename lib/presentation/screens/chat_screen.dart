@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:medimind/service/chatbot/authorized_context_provider.dart';
+import 'package:medimind/service/chatbot/chat_memory_service.dart';
 import 'package:medimind/service/chatbot/chatbot_prompts.dart';
 import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
 import 'package:medimind/service/chatbot/lm_studio_config.dart';
@@ -13,9 +16,10 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final AuthorizedContextProvider _contextProvider =
-      LocalDrugListContextProvider();
+  late final AuthorizedContextProvider _contextProvider;
+  late final ChatMemoryService _chatMemoryService;
   late final LmStudioChatClient _chatClient;
+  String? _sessionId;
   // Toggle between 'Quick' and 'Detailed' models
   bool _isDetailedMode = false;
   bool _isTyping = false; // To show typing indicator
@@ -45,6 +49,42 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _chatClient = LmStudioChatClient();
+    _chatMemoryService = ChatMemoryService(
+      firestore: FirebaseFirestore.instance,
+      auth: FirebaseAuth.instance,
+    );
+    _contextProvider = FirestoreProductDescriptionContextProvider(
+      FirebaseFirestore.instance,
+      fallbackProvider: LocalDrugListContextProvider(),
+    );
+    _initializeSession();
+  }
+
+  Future<void> _initializeSession() async {
+    try {
+      final sessionId = await _chatMemoryService.ensureSessionId();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _sessionId = sessionId;
+      });
+    } catch (_) {}
+  }
+
+  Future<String> _getOrCreateSessionId() async {
+    final currentSessionId = _sessionId;
+    if (currentSessionId != null && currentSessionId.isNotEmpty) {
+      return currentSessionId;
+    }
+
+    final created = await _chatMemoryService.ensureSessionId();
+    if (mounted) {
+      setState(() {
+        _sessionId = created;
+      });
+    }
+    return created;
   }
 
   Future<void> _handleSendMessage() async {
@@ -70,14 +110,42 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
 
+      final sessionId = await _getOrCreateSessionId();
+
+      final conversationContext =
+          await _chatMemoryService.buildConversationContext(sessionId);
+
       final authorizedContext =
           await _contextProvider.buildAuthorizedContext(userText);
+
+      await _chatMemoryService.saveMessage(
+        sessionId: sessionId,
+        sender: 'user',
+        content: userText,
+      );
+
+      final combinedContext = [
+        if (authorizedContext.trim().isNotEmpty) authorizedContext.trim(),
+        if (conversationContext.trim().isNotEmpty) conversationContext.trim(),
+      ].join('\n\n');
 
       response = await _chatClient.complete(
         endpoint: endpoint,
         model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
-        authorizedContext: authorizedContext,
+        authorizedContext: combinedContext,
         question: userText,
+      );
+
+      await _chatMemoryService.saveMessage(
+        sessionId: sessionId,
+        sender: 'bot',
+        content: response,
+      );
+
+      await _chatMemoryService.updateSummary(
+        sessionId: sessionId,
+        userMessage: userText,
+        assistantMessage: response,
       );
     } on LmStudioException catch (error) {
       response =

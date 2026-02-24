@@ -1,10 +1,11 @@
-const String kRefusalResponse = 'Unable to answer with certainty.';
+const String kRefusalResponse =
+  'With the current information available to us, we cannot answer this question with certainty. Please consult your doctor.';
 
 const String kStrictSystemPrompt = '''
 You may ONLY use information contained between BEGIN_CONTEXT and END_CONTEXT.
 You may NOT use prior knowledge, training data, or assumptions.
 If the answer is not explicitly present, respond exactly with:
-"With the current information available to us, we cannot answer this question with certainty. Please consult your doctor."
+"$kRefusalResponse"
 Do not paraphrase beyond the meaning of the text.
 Do not add new facts.
 Do not infer or guess.
