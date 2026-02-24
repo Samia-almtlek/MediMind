@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController(
     initialScrollOffset: 500 * 68.0 - 150,
   );
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _medicationsSubscription;
 
   String _getMonthName(DateTime date) {
     List<String> months = [
@@ -48,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadInitialData() {
-    FirebaseFirestore.instance
+    _medicationsSubscription = FirebaseFirestore.instance
         .collection('user_medications')
         .snapshots()
         .listen((snapshot) {
@@ -56,11 +58,19 @@ class _HomeScreenState extends State<HomeScreen> {
         print(
             "Firestore Data: ${doc.data()}"); // Check your debug console for this!
       }
+      if (!mounted) return;
       setState(() {
         userAddedMeds =
             snapshot.docs.map((doc) => Medication.fromFirestore(doc)).toList();
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _medicationsSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
