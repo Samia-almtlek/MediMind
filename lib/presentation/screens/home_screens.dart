@@ -127,6 +127,41 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  Future<void> _toggleMedicationCompletion(Medication med, bool isChecked) async {
+    if (med.id.isEmpty) return;
+
+    final targetDate = _normalizeDate(selectedDate);
+    final updatedDates = List<DateTime>.from(med.completedDates);
+
+    if (isChecked) {
+      if (!updatedDates.any((d) => DateUtils.isSameDay(d, targetDate))) {
+        updatedDates.add(targetDate);
+      }
+    } else {
+      updatedDates.removeWhere((d) => DateUtils.isSameDay(d, targetDate));
+    }
+
+    setState(() {
+      final sourceIndex = userAddedMeds.indexWhere((item) => item.id == med.id);
+      if (sourceIndex != -1) {
+        userAddedMeds[sourceIndex].completedDates
+          ..clear()
+          ..addAll(updatedDates);
+      }
+    });
+
+    await FirebaseFirestore.instance
+        .collection('user_medications')
+        .doc(med.id)
+        .update({
+      'completedDates': updatedDates.map((d) => Timestamp.fromDate(_normalizeDate(d))).toList(),
+    });
+  }
+
   void _showMoreActions() {
     showModalBottomSheet(
       context: context,
@@ -450,15 +485,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   activeColor: AppColors.primaryBlue,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5)),
-                  onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        med.completedDates.add(selectedDate);
-                      } else {
-                        med.completedDates.removeWhere(
-                            (d) => DateUtils.isSameDay(d, selectedDate));
-                      }
-                    });
+                  onChanged: (bool? value) async {
+                    await _toggleMedicationCompletion(med, value ?? false);
                   },
                 ),
               ),
