@@ -33,8 +33,8 @@ class CaregiverRepositoryImpl implements CaregiverRepository {
       addedAt: caregiver.addedAt,
     );
 
-    await _firestoreService.caregivers.add(model.toFirestore());
-  }
+await _firestoreService.caregivers
+      .add(model.toFirestore());  }
 
   @override
   Future<void> deactivateCaregiver(String caregiverId) async {
