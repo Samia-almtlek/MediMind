@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'manual_input_screen.dart';
+import 'package:medimind/domain/models/medication.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -124,7 +124,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateTime(date.year, date.month, date.day);
   }
 
-  Future<void> _toggleMedicationCompletion(Medication med, bool isChecked) async {
+  Future<void> _toggleMedicationCompletion(
+      Medication med, bool isChecked) async {
     if (med.id.isEmpty) return;
 
     final targetDate = _normalizeDate(selectedDate);
@@ -151,7 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
         .collection('user_medications')
         .doc(med.id)
         .update({
-      'completedDates': updatedDates.map((d) => Timestamp.fromDate(_normalizeDate(d))).toList(),
+      'completedDates': updatedDates
+          .map((d) => Timestamp.fromDate(_normalizeDate(d)))
+          .toList(),
     });
   }
 
@@ -187,7 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: userAddedMeds.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text("No medications active", style: TextStyle(color: Colors.grey)),
+                      child: Text("No medications active",
+                          style: TextStyle(color: Colors.grey)),
                     )
                   : ListView.builder(
                       shrinkWrap: true,
@@ -199,29 +203,36 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                            border:
+                                Border.all(color: Colors.grey.withOpacity(0.1)),
                           ),
                           child: ListTile(
-                            leading: const Icon(Icons.medication_rounded, color: AppColors.primaryBlue),
-                            title: Text(med.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            leading: const Icon(Icons.medication_rounded,
+                                color: AppColors.primaryBlue),
+                            title: Text(med.name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
                             subtitle: Text(med.dosage),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue),
+                                  icon: const Icon(Icons.edit_outlined,
+                                      color: AppColors.primaryBlue),
                                   onPressed: () {
                                     Navigator.pop(context);
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ManualInputScreen(medicationToEdit: med),
+                                        builder: (context) => ManualInputScreen(
+                                            medicationToEdit: med),
                                       ),
                                     );
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                  icon: const Icon(Icons.delete_outline_rounded,
+                                      color: Colors.redAccent),
                                   onPressed: () => _confirmDeletion(med),
                                 ),
                               ],
@@ -244,7 +255,8 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Remove Medication?"),
-        content: Text("This will permanently delete ${med.name} from your schedule and database."),
+        content: Text(
+            "This will permanently delete ${med.name} from your schedule and database."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -264,7 +276,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             },
-            child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Delete",
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -445,7 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(med.name,
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(med.dosage, style: const TextStyle(color: Colors.black54)),
+                    Text(med.dosage,
+                        style: const TextStyle(color: Colors.black54)),
                   ],
                 ),
               ),
