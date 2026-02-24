@@ -4,6 +4,7 @@ import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/widgets/speaker_button.dart';
+
 class ScanBarcodeScreen extends StatefulWidget {
   const ScanBarcodeScreen({super.key});
 
@@ -120,19 +121,18 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
             children: [
               Text(
                 isFound ? "PRODUCT FOUND" : "NOT FOUND PRODUCT",
-                
                 style: TextStyle(
                   color: isFound ? Colors.green[800] : Colors.red[800],
                   fontWeight: FontWeight.bold,
                 ),
               ),
               SpeakerButton(
-  text: isFound
-      ? "Product found. $title. Dosage: $subtitle."
-      : "Product not found. This barcode is not in the database.",
-  size: 24,
-  color: AppColors.primaryBlue,
-),
+                text: isFound
+                    ? "Product found. $title. Dosage: $subtitle."
+                    : "Product not found. This barcode is not in the database.",
+                size: 24,
+                color: AppColors.primaryBlue,
+              ),
 
               const SizedBox(height: 10),
               Text(title,
@@ -158,10 +158,10 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => TreatmentDurationScreen(
-                          medicationName:
-                              title, // Pass data if your screen accepts it
-                          dosage: subtitle, // Example: pass the dosage info
-                        ),
+                            medicationName:
+                                title, // Pass data if your screen accepts it
+                            dosage: subtitle, // Example: pass the dosage info
+                            isFromScanner: true),
                       ),
                     ).then((_) {
                       // Optional: Resume scanning when returning back to this screen
