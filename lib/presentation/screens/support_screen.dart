@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../data/models/support_ticket.model.dart';
+import '../../data/models/support_ticket_model.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
