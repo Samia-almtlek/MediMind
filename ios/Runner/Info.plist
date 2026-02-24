@@ -66,5 +66,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>MediMind needs notifications to remind you to take medication.</string>
+
 </dict>
 </plist>
