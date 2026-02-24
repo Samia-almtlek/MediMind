@@ -5,7 +5,8 @@ abstract class DoseLogRepository {
 
   Future<void> addDoseLog(DoseLogEntity log);
 
-  Future<void> markAsTaken(String doseId);
+  Future<void> markAsTaken(String medicatieId, String doseId);
 
-  Future<void> markAsMissed(String doseId);
+  Future<void> markAsMissed(String medicatieId, String doseId);
+  Future<void> incrementReminderCount(String medicatieId, String doseId);
 }
