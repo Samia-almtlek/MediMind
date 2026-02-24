@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_auth/firebase_auth.dart' show EmailAuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
 import 'package:medimind/domain/models/medication.dart';
@@ -12,12 +11,25 @@ class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
 
   Future<List<Medication>> _loadUserMedicationsForReport(String uid) async {
-    final snapshot = await FirebaseFirestore.instance
+    final snapshotByUser = await FirebaseFirestore.instance
         .collection('user_medications')
         .where('userId', isEqualTo: uid)
         .get();
 
-    return snapshot.docs
+    final snapshotLegacyNoUserId = await FirebaseFirestore.instance
+        .collection('user_medications')
+        .where('userId', isNull: true)
+        .get();
+
+    final mergedDocsById = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    for (final doc in snapshotByUser.docs) {
+      mergedDocsById[doc.id] = doc;
+    }
+    for (final doc in snapshotLegacyNoUserId.docs) {
+      mergedDocsById[doc.id] = doc;
+    }
+
+    return mergedDocsById.values
         .map((doc) => Medication.fromFirestore(doc))
         .toList();
   }
@@ -213,16 +225,25 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showInfoPopup(BuildContext context, String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(child: Text(content)),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Understood"))],
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold),
       ),
-    );
-  }
+      content: SingleChildScrollView(child: Text(content)),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Understood"),
+        )
+      ],
+    ),
+  );
+}
 
+  // ignore: unused_element
   void _exportData(BuildContext context) {
     final box = Hive.box('medical_id_data');
     final bloodType = box.get('bloodType', defaultValue: 'Not set');
