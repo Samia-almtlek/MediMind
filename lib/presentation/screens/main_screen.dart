@@ -15,25 +15,23 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  
   int _selectedIndex = 0;
 
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
-    const HomeScreen(), 
-    const ScheduleScreen(), 
+    const HomeScreen(),
+    const ScheduleScreen(),
     const ChatScreen(),
     const ProfileScreen(),
   ];
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
- 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    DrugLoader.loadDrugsIfNeeded();
-  });
-}
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DrugLoader.loadDrugsIfNeeded();
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -46,20 +44,22 @@ void initState() {
     return Scaffold(
       body: _screens[_selectedIndex],
       // The Floating Action Button
-      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
-        backgroundColor: AppColors.primaryBlue,
-        child: const Icon(Icons.add, color: Colors.white, size: 30),
-        onPressed: () {
-
-  Navigator.push(
-    context, 
-    MaterialPageRoute(builder: (context) => const AddChoiceScreen())
-  ) .then ((_) {
-    setState(() {}); // Refresh the state when returning from AddChoiceScreen
-  });
-
-},
-      ) : null,
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primaryBlue,
+              child: const Icon(Icons.add, color: Colors.white, size: 30),
+              onPressed: () {
+                Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const AddChoiceScreen()))
+                    .then((_) {
+                  setState(
+                      () {}); // Refresh the state when returning from AddChoiceScreen
+                });
+              },
+            )
+          : null,
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: AppColors.backgroundWhite,
         currentIndex: _selectedIndex,
@@ -69,9 +69,12 @@ void initState() {
         unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Schedule'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month), label: 'Schedule'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
     );
