@@ -5,7 +5,7 @@ class Medication {
   final String name;
   final String dosage;
   final String time;
-  final String frequency; 
+  final String frequency;
   final DateTime endDate;
   final DateTime startDate;
   final List<DateTime> completedDates;
@@ -89,7 +89,7 @@ class Medication {
 
   Stream<List<Medication>> getUserMedications(String userId) {
     return FirebaseFirestore.instance
-        .collection('medications')
+        .collection('user_medications')
         .where('userId', isEqualTo: userId) // Only get meds for THIS user
         .snapshots() // This makes it a "Live" stream
         .map((snapshot) =>
