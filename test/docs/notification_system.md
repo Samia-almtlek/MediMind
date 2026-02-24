@@ -1,6 +1,6 @@
-# 💊 MediMind – Notification Subsystem Documentation
+# MediMind – Notification Subsystem Documentation
 
-## 📌 Overview
+##  Overview
 
 The MediMind Notification Subsystem is a hybrid medical compliance engine designed to ensure:
 
@@ -23,9 +23,9 @@ The system uses:
 
 ---
 
-# 🧠 Architecture Overview
+#  Architecture Overview
 
-## 🔁 Hybrid Reminder System
+##  Hybrid Reminder System
 
 The system is designed as:
 
@@ -45,9 +45,9 @@ This guarantees medical safety.
 
 ---
 
-# 🔔 TYPE 1 — Medication Reminder Engine
+#  TYPE 1 — Medication Reminder Engine
 
-## 📍 What Happens When a Dose Is Scheduled?
+##  What Happens When a Dose Is Scheduled?
 
 When a medication dose is created:
 
@@ -81,7 +81,7 @@ scheduledNotificationIds
 
 ---
 
-## 🟢 When User Presses “Taken”
+##  When User Presses “Taken”
 
 * `status` → becomes `"taken"`
 * `ingenomenTijd` is stored
@@ -90,7 +90,7 @@ scheduledNotificationIds
 
 ---
 
-## 🔴 If User Ignores All 3 Reminders
+##  If User Ignores All 3 Reminders
 
 After the third reminder:
 
@@ -102,15 +102,15 @@ Then backend escalation handles caregiver notification.
 
 ---
 
-# 🚨 TYPE 2 — Caregiver Escalation Engine
+#  TYPE 2 — Caregiver Escalation Engine
 
-## 🎯 Purpose
+##  Purpose
 
 Notify caregiver when a medication dose was missed.
 
 ---
 
-## 🧩 Backend Logic
+##  Backend Logic
 
 Handled by Firebase Cloud Function:
 
@@ -122,7 +122,7 @@ Runs via Cloud Scheduler.
 
 ---
 
-## 🔎 What It Checks
+##  What It Checks
 
 Firestore query:
 
@@ -139,7 +139,7 @@ If matched:
 
 ---
 
-## 📧 Email Content
+##  Email Content
 
 Includes:
 
@@ -149,7 +149,7 @@ Includes:
 
 ---
 
-## 📂 Escalation Log Structure
+##  Escalation Log Structure
 
 Collection: `escalation_logs`
 
@@ -167,15 +167,15 @@ Prevents duplicate alerts.
 
 ---
 
-# 📦 TYPE 3 — Stock Monitoring Engine
+#  TYPE 3 — Stock Monitoring Engine
 
-## 🎯 Purpose
+##  Purpose
 
 Ensure user never runs out of medication.
 
 ---
 
-## 🧠 Logic
+##  Logic
 
 Each medication has:
 
@@ -194,7 +194,7 @@ If remainingDays ≤ 3:
 
 ---
 
-## 🔁 Stock Updates
+##  Stock Updates
 
 | Action  | Behavior                 |
 | ------- | ------------------------ |
@@ -208,15 +208,15 @@ No alert spam.
 
 ---
 
-# 🔐 Lock Screen Privacy
+#  Lock Screen Privacy
 
-## 🎯 Purpose
+##  Purpose
 
 Protect sensitive medical data on lock screen.
 
 ---
 
-## 🧩 Implementation
+##  Implementation
 
 Hive box:
 
@@ -251,9 +251,9 @@ Works for:
 
 ---
 
-# ☁️ Cloud Function Setup Guide
+#  Cloud Function Setup Guide
 
-## 📌 Prerequisites
+##  Prerequisites
 
 * Firebase project
 * Blaze plan (required for Scheduler + SendGrid)
@@ -261,7 +261,7 @@ Works for:
 
 ---
 
-## 1️⃣ Install Firebase CLI
+## 1️ Install Firebase CLI
 
 ```bash
 npm install -g firebase-tools
@@ -270,7 +270,7 @@ firebase login
 
 ---
 
-## 2️⃣ Initialize Functions
+## 2️ Initialize Functions
 
 Inside project:
 
@@ -286,7 +286,7 @@ Choose:
 
 ---
 
-## 3️⃣ Install SendGrid
+## 3️ Install SendGrid
 
 Inside `functions` folder:
 
@@ -296,7 +296,7 @@ npm install @sendgrid/mail
 
 ---
 
-## 4️⃣ Add Secret Key
+## 4️ Add Secret Key
 
 ```bash
 firebase functions:secrets:set SENDGRID_KEY
@@ -306,7 +306,7 @@ Paste your SendGrid API key.
 
 ---
 
-## 5️⃣ Deploy
+## 5️ Deploy
 
 ```bash
 firebase deploy --only functions
@@ -314,7 +314,7 @@ firebase deploy --only functions
 
 ---
 
-## 6️⃣ Setup Cloud Scheduler
+## 6️ Setup Cloud Scheduler
 
 In Firebase Console:
 
@@ -330,7 +330,7 @@ Set:
 
 ---
 
-# 🔐 Firestore Index Setup
+#  Firestore Index Setup
 
 Because we use `collectionGroup("dose_logs")`
 You must create a composite index.
@@ -348,7 +348,7 @@ Wait until status = ENABLED.
 
 ---
 
-# 🧪 Testing Strategy (Manual)
+#  Testing Strategy (Manual)
 
 ## Reminder Test
 
