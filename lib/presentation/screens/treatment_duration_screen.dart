@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:medimind/utils/global_data.dart';
 import '../../utils/app_colors.dart';
-import 'package:intl/intl.dart';
 import 'success_screen.dart';
 import '../../domain/models/medication.dart';
 import '../../data/repositories_impl/user_medication_repository_impl.dart';
@@ -18,11 +17,13 @@ class TreatmentDurationScreen extends StatefulWidget {
   final String medicationName;
   final String dosage;
   final String? notes;
+  final Medication? medicationToEdit;
 
-  TreatmentDurationScreen({
+  const TreatmentDurationScreen({super.key, 
     required this.medicationName,
     required this.dosage,
     this.notes,
+    this.medicationToEdit,
   });
 
   @override
@@ -37,7 +38,44 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   int frequency = 1;
 
   // List of times for each daily dose (length matches frequency)
-  List<TimeOfDay> selectedTimes = [TimeOfDay(hour: 8, minute: 0)];
+  List<TimeOfDay> selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill with existing data if editing
+    if (widget.medicationToEdit != null) {
+      final med = widget.medicationToEdit!;
+      frequency = int.tryParse(med.frequency.split(" ")[0]) ?? 1;
+      
+      // Parse times from instructions
+      if (med.instructions.contains("Times:")) {
+        final timesStr = med.instructions.split("Times:")[1].split(".")[0].trim();
+        final times = timesStr.split(", ");
+        selectedTimes = times
+            .map((t) {
+              final parts = t.trim().split(":");
+              final hour = int.tryParse(parts[0]) ?? 8;
+              final minute = int.tryParse(parts[1].split(" ")[0]) ?? 0;
+              return TimeOfDay(hour: hour, minute: minute);
+            })
+            .toList();
+      }
+      
+      // Calculate duration from start and end dates
+      final daysDiff = med.endDate.difference(med.startDate).inDays + 1;
+      if (daysDiff == 7) {
+        selectedDuration = "7 days";
+      } else if (daysDiff == 14) {
+        selectedDuration = "14 days";
+      } else if (daysDiff == 30) {
+        selectedDuration = "30 days";
+      } else {
+        selectedDuration = "Custom";
+        customDays = daysDiff;
+      }
+    }
+  }
 
   // Updates the list of intake times when frequency changes
   // logic behind is that it evenly distributes throughout the day
@@ -77,11 +115,14 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
+        title: Text(
+          widget.medicationToEdit != null ? "Edit Schedule" : "Schedule Logic",
+          style: const TextStyle(color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -90,31 +131,31 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               "Duration",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             _buildDurationGrid(),
             if (selectedDuration == "Custom") _buildCustomDaysInput(),
-            SizedBox(height: 30),
-            Text(
+            const SizedBox(height: 30),
+            const Text(
               "Daily Frequency",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             _buildFrequencyDropdown(),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               "Intake Times",
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             _buildTimePickerList(),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             _buildCenteredSummary(),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
-                minimumSize: Size(double.infinity, 55),
+                minimumSize: const Size(double.infinity, 55),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -152,51 +193,89 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   // Note: Since your DB model seems to store one record per medication "plan",
                   // we save the frequency and instructions together.
 
-                  final newMedication = UserMedicationEntity(
-                    id: FirebaseFirestore.instance
+                  final String instructionsText =
+                      "Times: ${selectedTimes.map((t) => t.format(context)).join(', ')}. Notes: ${widget.notes ?? ''}";
+
+                  if (widget.medicationToEdit != null) {
+                    // EDIT MODE: Update existing medication in Firestore
+                    final med = widget.medicationToEdit!;
+                    await FirebaseFirestore.instance
                         .collection('user_medications')
-                        .doc()
-                        .id, // Generate ID
-                    userId: uid,
-                    productId: "",
-                    name: widget.medicationName,
-                    dosage: widget.dosage,
-                    frequencyPerDay: frequency,
-                    startDate: startDate,
-                    endDate: calculatedEndDate,
-                    instructions:
-                        "Times: ${selectedTimes.map((t) => t.format(context)).join(', ')}. Notes: ${widget.notes ?? ''}",
-                    isActive: true,
-                    aangemaaktViaOCR: false,
-                  );
+                        .doc(med.id)
+                        .update({
+                      'name': widget.medicationName,
+                      'dosage': widget.dosage,
+                      'frequencyPerDay': frequency,
+                      'startDate': startDate,
+                      'endDate': calculatedEndDate,
+                      'instructions': instructionsText,
+                    });
 
-                  // 4. Save to Firestore
-                  await repository.addUserMedication(newMedication);
-
-                  for (var time in selectedTimes) {
-                    userAddedMeds.add(
-                      Medication(
+                    // Update local list
+                    final index = userAddedMeds.indexWhere((m) => m.id == med.id);
+                    if (index != -1) {
+                      userAddedMeds[index] = Medication(
+                        id: med.id,
                         name: widget.medicationName,
                         dosage: widget.dosage,
                         frequency: "$frequency times per day",
-                        time: time.format(context),
+                        time: selectedTimes.isNotEmpty
+                            ? selectedTimes[0].format(context)
+                            : "8:00 AM",
                         endDate: calculatedEndDate,
-                        completedDates: [],
+                        completedDates: med.completedDates,
                         startDate: startDate,
-                        instructions:
-                            "Times: ${selectedTimes.map((t) => t.format(context)).join(', ')}. Notes: ${widget.notes ?? ''}",
-                      ),
+                        instructions: instructionsText,
+                      );
+                    }
+                  } else {
+                    // NEW MEDICATION MODE: Create new
+                    final newMedication = UserMedicationEntity(
+                      id: FirebaseFirestore.instance
+                          .collection('user_medications')
+                          .doc()
+                          .id, // Generate ID
+                      userId: uid,
+                      productId: "",
+                      name: widget.medicationName,
+                      dosage: widget.dosage,
+                      frequencyPerDay: frequency,
+                      startDate: startDate,
+                      endDate: calculatedEndDate,
+                      instructions: instructionsText,
+                      isActive: true,
+                      aangemaaktViaOCR: false,
+                      intakeTimes:
+                          selectedTimes.map((t) => t.format(context)).toList(),
+                      initialStock: 0,
+                      currentStock: 0,
                     );
-                  }
 
-                  // Create a medication entry for each selected time
+                    // 4. Save to Firestore
+                    await repository.addUserMedication(newMedication);
+
+                    for (var time in selectedTimes) {
+                      userAddedMeds.add(
+                        Medication(
+                          name: widget.medicationName,
+                          dosage: widget.dosage,
+                          frequency: "$frequency times per day",
+                          time: time.format(context),
+                          endDate: calculatedEndDate,
+                          completedDates: [],
+                          startDate: startDate,
+                          instructions: instructionsText,
+                        ),
+                      );
+                    }
+                  }
 
                   // 5. Navigate on Success
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          SuccessScreen(medicationName: widget.medicationName),
+                      builder: (context) => SuccessScreen(
+                          medicationName: widget.medicationName),
                     ),
                   );
                 } catch (e) {
@@ -205,7 +284,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   );
                 }
               },
-              child: Text(
+              child: const Text(
                 "Confirm & Save",
                 style: TextStyle(color: Colors.white, fontSize: 18),
               ),
@@ -276,7 +355,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
             onPressed: () => _selectTime(index),
             child: Text(
               selectedTimes[index].format(context),
-              style: TextStyle(fontSize: 18, color: AppColors.primaryBlue),
+              style: const TextStyle(fontSize: 18, color: AppColors.primaryBlue),
             ),
           ),
         );
@@ -294,7 +373,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     return Center(
       child: Container(
         width: double.infinity, // Zorgt voor een mooie uitlijning
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.lightTeal.withOpacity(0.3),
           borderRadius: BorderRadius.circular(15),
@@ -302,17 +381,17 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         ),
         child: Column(
           children: [
-            Text(
+            const Text(
               "Schedule Overview",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            Divider(),
+            const Divider(),
             Text("Medication: ${widget.medicationName} (${widget.dosage})"),
             Text("Frequency: $frequency times daily"),
             Text("Duration: $totalDays days"),
             Text(
               "Total Doses: ${totalDays * frequency}",
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.primaryBlue,
                 fontWeight: FontWeight.bold,
               ),
@@ -320,8 +399,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
 
             // Toon notities alleen als ze niet leeg zijn
             if (widget.notes != null && widget.notes!.isNotEmpty) ...[
-              Divider(),
-              Text(
+              const Divider(),
+              const Text(
                 "Notes:",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
@@ -330,7 +409,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                 child: Text(
                   widget.notes!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontStyle: FontStyle.italic,
                     color: Colors.black87,
                   ),

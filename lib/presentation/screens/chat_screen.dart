@@ -7,8 +7,12 @@ import 'package:medimind/service/chatbot/chatbot_prompts.dart';
 import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
 import 'package:medimind/service/chatbot/lm_studio_config.dart';
 import '../../utils/app_colors.dart';
+import '../../core/widgets/speaker_button.dart';
+
 
 class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
+
   @override
   _ChatScreenState createState() => _ChatScreenState();
 }
@@ -38,7 +42,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
@@ -178,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
+        title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("MediMind Assistant", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),),
@@ -198,7 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               itemCount: _messages.length + (_isTyping ? 1 : 0), // Add extra item for typing indicator
               itemBuilder: (context, index) {
                 if (index == _messages.length) {
@@ -217,9 +221,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildModeBanner() {
     return AnimatedContainer(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       color: _isDetailedMode ? AppColors.primaryBlue.withOpacity(0.1) : Colors.amber.withOpacity(0.1),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -229,7 +233,7 @@ class _ChatScreenState extends State<ChatScreen> {
             size: 14,
             color: _isDetailedMode ? AppColors.primaryBlue : Colors.orange,
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             _isDetailedMode ? "Detailed Mode: Extensive Medical Insights" : "Quick Mode: Fast & Direct Answers",
             style: TextStyle(
@@ -245,8 +249,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildToggleSwitch() {
     return Container(
-      margin: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      padding: EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius: BorderRadius.circular(20),
@@ -255,18 +259,18 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         children: [
           Text("Quick", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.normal : FontWeight.bold)),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Icon(Icons.bolt, size:14, color: _isDetailedMode ? Colors.grey : Colors.amber),
           Transform.scale(
             scale: 0.8,
             child: Switch(
               value: _isDetailedMode,
-              activeColor: AppColors.primaryBlue,
+              activeThumbColor: AppColors.primaryBlue,
               onChanged: (value) => setState(() => _isDetailedMode = value),
             ),
           ),
           Icon(Icons.biotech, size: 14, color: _isDetailedMode ? AppColors.primaryBlue : Colors.grey),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Text("Detailed", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
@@ -277,8 +281,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8),
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.grey[100],
           borderRadius: BorderRadius.circular(20),
@@ -287,12 +291,12 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Text("AI is generating response...", style: TextStyle(fontSize: 13, color: Colors.grey[600], fontStyle: FontStyle.italic)),
 
           ],
@@ -307,36 +311,53 @@ class _ChatScreenState extends State<ChatScreen> {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        margin: EdgeInsets.symmetric(vertical: 8),
-        padding: EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isUser ? AppColors.primaryBlue : Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-            bottomLeft: isUser ? Radius.circular(20) : Radius.circular(0),
-            bottomRight: isUser ? Radius.circular(0) : Radius.circular(20),
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(0),
+            bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(20),
           ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
               blurRadius: 5,
-              offset: Offset(0, 2)
+              offset: const Offset(0, 2)
             ),
           ],
         ),
-        child: Text(
-          msg["text"],
-          style: TextStyle(color: isUser ? Colors.white : Colors.black87, fontSize: 16, height: 1.4),
+       child: Row(
+  mainAxisSize: MainAxisSize.min,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Expanded(
+      child: Text(
+        msg["text"],
+        style: TextStyle(
+          color: isUser ? Colors.white : Colors.black87,
+          fontSize: 16,
+          height: 1.4,
         ),
       ),
-    );
+    ),
+    if (!isUser)
+      SpeakerButton(
+        text: msg["text"],
+        size: 18,
+        color: Colors.grey[600],
+      ),
+  ],
+),
+    ));
   }
 
   Widget _buildInputArea() {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 30),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
       ),
@@ -353,19 +374,19 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(30),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
               onSubmitted: (_) {
                 _handleSendMessage();
               },
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           GestureDetector(
             onTap: () {
               _handleSendMessage();
             },
-            child: CircleAvatar(
+            child: const CircleAvatar(
               radius: 25,
               backgroundColor: AppColors.primaryBlue,
               child: Icon(Icons.send_rounded, color: Colors.white),

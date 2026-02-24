@@ -1,18 +1,149 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_auth/firebase_auth.dart' show EmailAuthProvider;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:medimind/auth/presentation/screens/login_screen.dart';
+import 'package:medimind/domain/models/medication.dart';
+import 'package:medimind/service/pdf_service.dart';
+
+import '../../core/widgets/speaker_button.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
+
+  Future<List<Medication>> _loadUserMedicationsForReport(String uid) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('user_medications')
+        .where('userId', isEqualTo: uid)
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Medication.fromFirestore(doc))
+        .toList();
+  }
+
+  Future<List<String>> _loadFaqQuestionsForReport(String uid) async {
+    try {
+      final sessionsSnapshot = await FirebaseFirestore.instance
+          .collection('chat_sessions')
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      final sessionIds = sessionsSnapshot.docs.map((doc) => doc.id).toList();
+      if (sessionIds.isEmpty) return const [];
+
+      final List<Map<String, dynamic>> questions = [];
+      for (final sessionId in sessionIds.take(3)) {
+        final msgSnapshot = await FirebaseFirestore.instance
+            .collection('chat_messages')
+            .where('sessionId', isEqualTo: sessionId)
+            .where('sender', isEqualTo: 'user')
+            .orderBy('timestamp', descending: true)
+            .limit(2)
+            .get();
+
+        for (final doc in msgSnapshot.docs) {
+          final data = doc.data();
+          questions.add({
+            'content': (data['content'] ?? '').toString(),
+            'timestamp': data['timestamp'],
+          });
+        }
+      }
+
+      questions.sort((a, b) {
+        final ta = a['timestamp'];
+        final tb = b['timestamp'];
+        if (ta is Timestamp && tb is Timestamp) {
+          return tb.compareTo(ta);
+        }
+        return 0;
+      });
+
+      return questions
+          .map((q) => q['content'] as String)
+          .where((q) => q.trim().isNotEmpty)
+          .toSet()
+          .take(5)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<String>> _loadDoctorReferralInsightsForReport(String uid) async {
+    const referralKeywords = [
+      'consult',
+      'doctor',
+      'physician',
+      'medical professional',
+      'seek medical advice',
+      'contact your doctor',
+      'ask your doctor',
+      'see a doctor',
+    ];
+
+    try {
+      final sessionsSnapshot = await FirebaseFirestore.instance
+          .collection('chat_sessions')
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      final sessionIds = sessionsSnapshot.docs.map((doc) => doc.id).toList();
+      if (sessionIds.isEmpty) return const [];
+
+      final List<Map<String, dynamic>> candidateReplies = [];
+
+      for (final sessionId in sessionIds.take(5)) {
+        final msgSnapshot = await FirebaseFirestore.instance
+            .collection('chat_messages')
+            .where('sessionId', isEqualTo: sessionId)
+            .where('sender', isEqualTo: 'bot')
+            .orderBy('timestamp', descending: true)
+            .limit(20)
+            .get();
+
+        for (final doc in msgSnapshot.docs) {
+          final data = doc.data();
+          final content = (data['content'] ?? '').toString();
+          final lower = content.toLowerCase();
+          final isReferral = referralKeywords.any(lower.contains);
+
+          if (isReferral && content.trim().isNotEmpty) {
+            candidateReplies.add({
+              'content': content,
+              'timestamp': data['timestamp'],
+            });
+          }
+        }
+      }
+
+      candidateReplies.sort((a, b) {
+        final ta = a['timestamp'];
+        final tb = b['timestamp'];
+        if (ta is Timestamp && tb is Timestamp) {
+          return tb.compareTo(ta);
+        }
+        return 0;
+      });
+
+      return candidateReplies
+          .map((entry) => entry['content'] as String)
+          .toSet()
+          .take(5)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   Future<void> _deleteEverything(BuildContext context) async {
     // delete all local data (Hive)
     await Hive.box<String>('drugs').clear();
     await Hive.box('medical_id_data').clear();
-    await Hive.box<Map>('medication_stock').clear();
+    await Hive.box('medication_stock').clear();
 
     try {
       await FirebaseAuth.instance.currentUser?.delete();
@@ -36,7 +167,7 @@ class PrivacyScreen extends StatelessWidget {
         );
         await user.reauthenticateWithCredential(credential);
         await _deleteEverything(context);
-      } on FirebaseAuthException catch (e) {
+      } on FirebaseAuthException {
         String errorMessage = "Incorrect password.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),
@@ -46,7 +177,7 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showDeleteDialog(BuildContext context) {
-    final TextEditingController _passwordConfirmController = TextEditingController();
+    final TextEditingController passwordConfirmController = TextEditingController();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -57,7 +188,7 @@ class PrivacyScreen extends StatelessWidget {
             const Text("Under GDPR, you have the right to have all your data erased permanently."),
             const SizedBox(height: 15),
             TextField(
-              controller: _passwordConfirmController,
+              controller: passwordConfirmController,
               obscureText: true,
               decoration: InputDecoration(
                 hintText: "Confirm with password",
@@ -71,9 +202,9 @@ class PrivacyScreen extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () {
-              if (_passwordConfirmController.text.isNotEmpty) {
+              if (passwordConfirmController.text.isNotEmpty) {
                 Navigator.pop(dialogContext);
-                _reauthenticateAndDelete(context, _passwordConfirmController.text);
+                _reauthenticateAndDelete(context, passwordConfirmController.text);
               }
             },
             child: const Text("Delete Everything", style: TextStyle(color: Colors.white)),
@@ -84,16 +215,39 @@ class PrivacyScreen extends StatelessWidget {
   }
 
   void _showInfoPopup(BuildContext context, String title, String content) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(child: Text(content)),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Understood"))],
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          SpeakerButton(
+            text: content,
+            size: 20,
+            color: AppColors.primaryBlue,
+          ),
+        ],
       ),
-    );
-  }
+      content: SingleChildScrollView(child: Text(content)),
+      actions: [
+        TextButton(
+  onPressed: () async {
+    await SpeakerButton.stopSpeaking(); 
+    Navigator.pop(context);
+  },
+  child: const Text("Understood"),
+)
+      ],
+    ),
+  );
+}
 
+  // ignore: unused_element
   void _exportData(BuildContext context) {
     final box = Hive.box('medical_id_data');
     final bloodType = box.get('bloodType', defaultValue: 'Not set');
@@ -143,7 +297,40 @@ class PrivacyScreen extends StatelessWidget {
             "Right of Access", 
             "Download a copy of your medical data", 
             Icons.download_outlined,
-            onTap: () => _exportData(context),
+            onTap: () async {
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please sign in to export your report.'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                  return;
+                }
+
+                final meds = await _loadUserMedicationsForReport(user.uid);
+                final faqQuestions = await _loadFaqQuestionsForReport(user.uid);
+                final doctorReferralInsights =
+                    await _loadDoctorReferralInsightsForReport(user.uid);
+
+                await PdfService.generateHealthReport(
+                  meds,
+                  faqQuestions: faqQuestions,
+                  doctorReferralInsights: doctorReferralInsights,
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Export failed: $e'),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            },
           ),
           _buildPrivacyTile(
             "Data Processing", 

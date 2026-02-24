@@ -3,9 +3,12 @@ import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'manual_input_screen.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
@@ -104,11 +107,168 @@ class _HomeScreenState extends State<HomeScreen> {
     return filteredMeds;
   }
 
-  /// Adds a new medication to the active medications list
-  void _addNewMedication(Medication newMed) {
+  Future<void> _deleteMedication(Medication med) async {
+    if (med.id.isEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection('user_medications')
+        .doc(med.id)
+        .delete();
+
     setState(() {
-      activeMeds.add(newMed);
+      userAddedMeds.removeWhere((item) => item.id == med.id);
     });
+  }
+
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  Future<void> _toggleMedicationCompletion(Medication med, bool isChecked) async {
+    if (med.id.isEmpty) return;
+
+    final targetDate = _normalizeDate(selectedDate);
+    final updatedDates = List<DateTime>.from(med.completedDates);
+
+    if (isChecked) {
+      if (!updatedDates.any((d) => DateUtils.isSameDay(d, targetDate))) {
+        updatedDates.add(targetDate);
+      }
+    } else {
+      updatedDates.removeWhere((d) => DateUtils.isSameDay(d, targetDate));
+    }
+
+    setState(() {
+      final sourceIndex = userAddedMeds.indexWhere((item) => item.id == med.id);
+      if (sourceIndex != -1) {
+        userAddedMeds[sourceIndex].completedDates
+          ..clear()
+          ..addAll(updatedDates);
+      }
+    });
+
+    await FirebaseFirestore.instance
+        .collection('user_medications')
+        .doc(med.id)
+        .update({
+      'completedDates': updatedDates.map((d) => Timestamp.fromDate(_normalizeDate(d))).toList(),
+    });
+  }
+
+  void _showMoreActions() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.backgroundWhite,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              "Manage Medications",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 15),
+            Flexible(
+              child: userAddedMeds.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text("No medications active", style: TextStyle(color: Colors.grey)),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: userAddedMeds.length,
+                      itemBuilder: (context, index) {
+                        final med = userAddedMeds[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                          ),
+                          child: ListTile(
+                            leading: const Icon(Icons.medication_rounded, color: AppColors.primaryBlue),
+                            title: Text(med.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(med.dosage),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBlue),
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ManualInputScreen(medicationToEdit: med),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                                  onPressed: () => _confirmDeletion(med),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeletion(Medication med) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Remove Medication?"),
+        content: Text("This will permanently delete ${med.name} from your schedule and database."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () async {
+              Navigator.pop(context);
+              Navigator.pop(context);
+              await _deleteMedication(med);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text("${med.name} deleted"),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.black87,
+                ),
+              );
+            },
+            child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -116,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Today",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
@@ -125,8 +285,8 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.more_horiz, color: Colors.black),
-            onPressed: () {},
+            icon: const Icon(Icons.more_horiz, color: Colors.black),
+            onPressed: _showMoreActions,
           ),
         ],
       ),
@@ -138,7 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Text(
               _getMonthName(selectedDate),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppColors.iconGrey,
@@ -154,14 +314,14 @@ class _HomeScreenState extends State<HomeScreen> {
               DateUtils.isSameDay(selectedDate, today)
                   ? "Today's Schedule"
                   : "Schedule for ${selectedDate.day} ${_getMonthName(selectedDate).split(' ')[0]}",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
 
           //  Lijst (of Empty State)
           Expanded(
             child: _getListForSelectedDate().isEmpty
-                ? Center(
+                ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -187,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Builds a horizontal calendar automatically
   Widget _buildHorizontalCalendar() {
-    return Container(
+    return SizedBox(
       height: 100,
       child: ListView.builder(
         controller: _scrollController,
@@ -211,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             child: Container(
               width: 60,
-              margin: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppColors.primaryBlue
@@ -251,13 +411,13 @@ class _HomeScreenState extends State<HomeScreen> {
   // Builds the list of medications for the day
   Widget _buildMedicationList(List<Medication> meds) {
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: meds.length,
       itemBuilder: (context, index) {
         final med = meds[index];
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.lightTeal.withOpacity(0.4),
             borderRadius: BorderRadius.circular(15),
@@ -269,23 +429,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(med.time,
-                      style: TextStyle(
+                      style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primaryBlue)),
-                  Text("Scheduled",
+                  const Text("Scheduled",
                       style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
-              SizedBox(width: 20),
+              const SizedBox(width: 20),
               // Medication name and dosage
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(med.name,
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(med.dosage, style: TextStyle(color: Colors.black54)),
+                    Text(med.dosage, style: const TextStyle(color: Colors.black54)),
                   ],
                 ),
               ),
@@ -299,15 +459,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   activeColor: AppColors.primaryBlue,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(5)),
-                  onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        med.completedDates.add(selectedDate);
-                      } else {
-                        med.completedDates.removeWhere(
-                            (d) => DateUtils.isSameDay(d, selectedDate));
-                      }
-                    });
+                  onChanged: (bool? value) async {
+                    await _toggleMedicationCompletion(med, value ?? false);
                   },
                 ),
               ),

@@ -8,6 +8,8 @@ import 'chat_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
@@ -18,10 +20,10 @@ class _MainScreenState extends State<MainScreen> {
 
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
-    HomeScreen(), 
-    ScheduleScreen(), 
-    ChatScreen(),
-    ProfileScreen(),
+    const HomeScreen(), 
+    const ScheduleScreen(), 
+    const ChatScreen(),
+    const ProfileScreen(),
   ];
 @override
 void initState() {
@@ -46,12 +48,12 @@ void initState() {
       // The Floating Action Button
       floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
         backgroundColor: AppColors.primaryBlue,
-        child: Icon(Icons.add, color: Colors.white, size: 30),
+        child: const Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
 
   Navigator.push(
     context, 
-    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+    MaterialPageRoute(builder: (context) => const AddChoiceScreen())
   ) .then ((_) {
     setState(() {}); // Refresh the state when returning from AddChoiceScreen
   });

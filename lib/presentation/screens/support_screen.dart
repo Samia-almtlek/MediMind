@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-
+import '../../core/widgets/speaker_button.dart';
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
@@ -33,8 +33,8 @@ class _SupportScreenState extends State<SupportScreen> {
   int? _expandedIndex;
 
   void _showContactForm() {
-    final _formKey = GlobalKey<FormState>();
-    final _messageController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final messageController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -46,7 +46,7 @@ class _SupportScreenState extends State<SupportScreen> {
           left: 20, right: 20, top: 20,
         ),
         child: Form(
-          key: _formKey,
+          key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -55,7 +55,7 @@ class _SupportScreenState extends State<SupportScreen> {
               const Text("Contact Support", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
               TextFormField(
-                controller: _messageController,
+                controller: messageController,
                 maxLines: 4,
                 decoration: InputDecoration(
                   hintText: "Describe your problem or question...",
@@ -71,7 +71,7 @@ class _SupportScreenState extends State<SupportScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 onPressed: () {
-                  if (_formKey.currentState!.validate()) {
+                  if (formKey.currentState!.validate()) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Message sent! We will contact you soon."), backgroundColor: Colors.green),
@@ -158,11 +158,26 @@ class _SupportScreenState extends State<SupportScreen> {
               });
             },
           ),
-          if (isExpanded)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-              child: Text(_faqs[index]['answer']!, style: TextStyle(color: Colors.grey[700], height: 1.5)),
-            ),
+        if (isExpanded)
+  Padding(
+    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _faqs[index]['answer']!,
+          style: TextStyle(color: Colors.grey[700], height: 1.5),
+        ),
+        const SizedBox(height: 8),
+        SpeakerButton(
+          text:
+              "${_faqs[index]['question']!}. ${_faqs[index]['answer']!}",
+          size: 20,
+          color: AppColors.primaryBlue,
+        ),
+      ],
+    ),
+  ),
         ],
       ),
     );
