@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
-import '../../utils/global_data.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+
+import '../../utils/app_colors.dart';
+import '../../data/models/user_medication_model.dart'; // 🔥 changed model
 import '../../domain/models/medication.dart';
 import '../../core/widgets/speaker_button.dart';
 
@@ -22,125 +25,113 @@ class ScheduleScreen extends StatelessWidget {
 }
   @override
   Widget build(BuildContext context) {
-    // Process the global list to split multiple times into individual entries
-    final List<Medication> flattenedMeds =
-        _getFlattenedMedicationList(userAddedMeds);
-    final Map<String, List<Medication>> groupedMeds =
-        _groupMedsByMonth(flattenedMeds);
+    final String? uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-     appBar: AppBar(
-  title: Text(
-    "Treatment Plan",
-    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-  ),
-  backgroundColor: Colors.white,
-  elevation: 0,
-  centerTitle: true,
-  actions: [
-    SpeakerButton(
-      text: _buildScheduleSummary(flattenedMeds),
-      size: 22,
-      color: AppColors.primaryBlue,
-    ),
-  ],
-),
-      body: flattenedMeds.isEmpty
+      appBar: AppBar(
+        title: Text(
+          "Treatment Plan",
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: uid == null
           ? _buildEmptyState()
-          : _buildGroupedTreatmentList(groupedMeds),
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('user_medications')
+                  .where('userId', isEqualTo: uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                final List<UserMedicationModel> meds =
+                    snapshot.data!.docs
+                        .map((doc) =>
+                            UserMedicationModel.fromFirestore(doc))
+                        .toList();
+
+                return _buildGroupedTreatmentList(meds, context);
+              },
+            ),
     );
   }
 
-  /// NEW: Helper to turn 1 Medication with 3 times into 3 Medication entries for display
-  List<Medication> _getFlattenedMedicationList(List<Medication> meds) {
-    List<Medication> results = [];
+  /// 🔥 GROUPING BY MONTH (based on endDate)
+  Widget _buildGroupedTreatmentList(
+      List<UserMedicationModel> meds,
+      BuildContext context) {
+    Map<String, List<UserMedicationModel>> groups = {};
+
     for (var med in meds) {
-      // Extract times from: "Times: 8:00 AM, 4:00 PM. Notes: ..."
-      String timePart =
-          med.instructions.split("Notes:")[0].replaceAll("Times: ", "").trim();
+      String monthKey =
+          DateFormat('MMMM yyyy').format(med.endDate ?? med.startDate);
 
-      // Split by comma and clean up whitespace
-      List<String> allTimes = timePart
-          .split(',')
-          .map((t) => t.trim())
-          .where((t) => t.isNotEmpty)
-          .toList();
-
-      if (allTimes.isEmpty) {
-        results.add(med); // Fallback if parsing fails
-      } else {
-        for (String t in allTimes) {
-          results.add(
-            Medication(
-              id: med.id,
-              name: med.name,
-              dosage: med.dosage,
-              time: t, // Set the specific time for this card
-              startDate: med.startDate,
-              endDate: med.endDate,
-              completedDates: med.completedDates,
-              instructions: med.instructions,
-              frequency: med.frequency,
-            ),
-          );
-        }
-      }
-    }
-    return results;
-  }
-
-  Map<String, List<Medication>> _groupMedsByMonth(List<Medication> meds) {
-    Map<String, List<Medication>> groups = {};
-    for (var med in meds) {
-      String monthKey = DateFormat('MMMM yyyy').format(med.endDate);
-      if (groups[monthKey] == null) groups[monthKey] = [];
+      groups.putIfAbsent(monthKey, () => []);
       groups[monthKey]!.add(med);
     }
-    return groups;
-  }
 
-  Widget _buildGroupedTreatmentList(Map<String, List<Medication>> groupedMeds) {
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: groupedMeds.keys.length,
+      itemCount: groups.keys.length,
       itemBuilder: (context, index) {
-        String month = groupedMeds.keys.elementAt(index);
-        List<Medication> medsInMonth = groupedMeds[month]!;
+        String month = groups.keys.elementAt(index);
+        List<UserMedicationModel> medsInMonth = groups[month]!;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding:
-                  const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+                  const EdgeInsets.symmetric(vertical: 12.0),
               child: Text(
                 month,
                 style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.iconGrey),
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.iconGrey,
+                ),
               ),
             ),
-            ...medsInMonth.map((med) => _buildTreatmentCard(med)).toList(),
+            ...medsInMonth
+                .map((med) =>
+                    _buildTreatmentCard(med, context))
+                .toList(),
           ],
         );
       },
     );
   }
 
-  Widget _buildTreatmentCard(Medication med) {
-    final DateTime today =
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    final DateTime endDateOnly =
-        DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
+  /// 🔥 CARD WITH STOCK + REFILL
+  Widget _buildTreatmentCard(
+      UserMedicationModel med,
+      BuildContext context) {
+    final DateTime today = DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day);
+
+    final DateTime endDateOnly = DateTime(
+        (med.endDate ?? med.startDate).year,
+        (med.endDate ?? med.startDate).month,
+        (med.endDate ?? med.startDate).day);
 
     bool isDatePassed = today.isAfter(endDateOnly);
-    // Note: If you want specific completion for specific times,
-    // you'll eventually need to store completed times in Firestore too.
-    bool isFullyCompleted =
-        med.completedDates.any((d) => DateUtils.isSameDay(d, endDateOnly));
-    final bool isActive = !isDatePassed && !isFullyCompleted;
+
+    final bool isActive = !isDatePassed && med.isActive;
+
+    final bool isLowStock =
+        med.currentStock <= med.lowStockThresholdDays;
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -164,57 +155,147 @@ class ScheduleScreen extends StatelessWidget {
               color: AppColors.lightTeal.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.access_time_filled, color: AppColors.primaryBlue),
+            child: Icon(Icons.access_time_filled,
+                color: AppColors.primaryBlue),
           ),
           SizedBox(width: 16),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   med.name,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
                 ),
                 Text(
                   "Dosage: ${med.dosage}",
-                  style: TextStyle(color: Colors.grey[600]),
+                  style:
+                      TextStyle(color: Colors.grey[600]),
                 ),
                 SizedBox(height: 4),
                 Text(
-                  "Scheduled for: ${med.time}",
+                  "Times: ${med.intakeTimes.join(", ")}",
                   style: TextStyle(
                     color: AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
+                SizedBox(height: 8),
+
+                /// 🔥 STOCK DISPLAY
+                Text(
+                  "Stock left: ${med.currentStock}",
+                  style: TextStyle(
+                    color:
+                        isLowStock ? Colors.red : Colors.green,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                if (isLowStock)
+                  Text(
+                    "Low stock — please refill",
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                    ),
+                  ),
+
+                SizedBox(height: 6),
+
+                /// 🔥 REFILL BUTTON
+                ElevatedButton(
+                  onPressed: () =>
+                      _showRefillDialog(context, med),
+                  child: Text("Refill"),
+                ),
               ],
             ),
           ),
+
           _buildStatusBadge(isActive),
         ],
       ),
     );
   }
 
+  /// 🔥 REFILL DIALOG
+  void _showRefillDialog(
+      BuildContext context,
+      UserMedicationModel med) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Refill Medication"),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: "Enter new quantity",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context),
+              child: Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final int? newAmount =
+                    int.tryParse(controller.text);
+
+                if (newAmount == null ||
+                    newAmount <= 0) return;
+
+                await FirebaseFirestore.instance
+    .collection('user_medications')
+    .doc(med.id)
+    .update({
+  'currentStock': FieldValue.increment(newAmount),
+  'initialStock': med.currentStock + newAmount,
+});
+
+                Navigator.pop(context);
+              },
+              child: Text("Confirm"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildStatusBadge(bool isActive) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(
+          horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green[50] : Colors.red[50],
+        color:
+            isActive ? Colors.green[50] : Colors.red[50],
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isActive
               ? Colors.green.withOpacity(0.3)
               : Colors.red.withOpacity(0.3),
-          width: 1,
         ),
       ),
       child: Text(
         isActive ? "Active" : "Finished",
         style: TextStyle(
-            color: isActive ? Colors.green : Colors.red,
-            fontSize: 12,
-            fontWeight: FontWeight.bold),
+          color:
+              isActive ? Colors.green : Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -222,21 +303,29 @@ class ScheduleScreen extends StatelessWidget {
   Widget _buildEmptyState() {
     return Center(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment:
+            MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_edu, size: 80, color: Colors.grey[300]),
+          Icon(Icons.history_edu,
+              size: 80,
+              color: Colors.grey[300]),
           SizedBox(height: 16),
           Text(
             "No active treatment plans",
             style: TextStyle(
-                fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
+              fontSize: 18,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 40, vertical: 8),
             child: Text(
-              "Your scheduled medications and treatment history will appear here.",
+              "Your scheduled medications will appear here.",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[400]),
+              style:
+                  TextStyle(color: Colors.grey[400]),
             ),
           ),
         ],

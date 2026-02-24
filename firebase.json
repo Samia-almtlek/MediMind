@@ -1,1 +1,41 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"medimind-750fe","appId":"1:981087427356:android:349e5183ee82506c4f78d9","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"medimind-750fe","configurations":{"android":"1:981087427356:android:349e5183ee82506c4f78d9","ios":"1:981087427356:ios:ae3cdd9066631a334f78d9","macos":"1:981087427356:ios:ae3cdd9066631a334f78d9","web":"1:981087427356:web:2b72438dad4e837e4f78d9","windows":"1:981087427356:web:ff6986ffe66bb5ec4f78d9"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "medimind-750fe",
+          "appId": "1:981087427356:android:349e5183ee82506c4f78d9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "medimind-750fe",
+          "configurations": {
+            "android": "1:981087427356:android:349e5183ee82506c4f78d9",
+            "ios": "1:981087427356:ios:ae3cdd9066631a334f78d9",
+            "macos": "1:981087427356:ios:ae3cdd9066631a334f78d9",
+            "web": "1:981087427356:web:2b72438dad4e837e4f78d9",
+            "windows": "1:981087427356:web:ff6986ffe66bb5ec4f78d9"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}

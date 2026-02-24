@@ -10,6 +10,12 @@ class UserMedicationEntity {
   final String? instructions;
   final bool isActive;
   final bool aangemaaktViaOCR;
+  final List<String> intakeTimes;
+    // 🆕 STOCK FIELDS
+  final int initialStock;
+  final int currentStock;
+  final int lowStockThresholdDays;
+  final DateTime? lastStockAlertAt;
 
   const UserMedicationEntity({
     required this.id,
@@ -23,5 +29,11 @@ class UserMedicationEntity {
     this.instructions,
     required this.isActive,
     required this.aangemaaktViaOCR,
+     required this.intakeTimes,
+         // 🆕
+    required this.initialStock,
+    required this.currentStock,
+    this.lowStockThresholdDays = 3,
+    this.lastStockAlertAt,
   });
 }
