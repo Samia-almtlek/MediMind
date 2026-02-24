@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
 import 'package:intl/intl.dart';
-import '../../domain/models/medication.dart';
+import 'package:medimind/domain/models/medication.dart';
 
 class ScheduleScreen extends StatelessWidget {
   const ScheduleScreen({super.key});
@@ -144,7 +144,8 @@ class ScheduleScreen extends StatelessWidget {
               color: AppColors.lightTeal.withOpacity(0.5),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.access_time_filled, color: AppColors.primaryBlue),
+            child: const Icon(Icons.access_time_filled,
+                color: AppColors.primaryBlue),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -153,7 +154,8 @@ class ScheduleScreen extends StatelessWidget {
               children: [
                 Text(
                   med.name,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
                   "Dosage: ${med.dosage}",
