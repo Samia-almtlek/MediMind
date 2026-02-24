@@ -23,7 +23,7 @@ class _NotificationSettingsScreenState
   @override
   void initState() {
     super.initState();
-    _settingsBox = Hive.box('medical_id_data');
+    _settingsBox = Hive.box('notification_settings'); // 🔥 CHANGED
     _loadSettings();
   }
 
@@ -56,13 +56,15 @@ class _NotificationSettingsScreenState
       setState(() {
         _summaryTime = picked;
       });
-      // Sla op in Hive
       _settingsBox.put('summaryTime', '${picked.hour}:${picked.minute}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool hideSensitive =
+        _settingsBox.get('hideSensitive', defaultValue: false);
+
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
@@ -96,7 +98,18 @@ class _NotificationSettingsScreenState
             _aiTips,
             (val) => setState(() => _aiTips = val),
           ),
-          // Voeg dit toe onder de laatste _buildSwitchTile:
+
+          // 🔒 NEW LOCK SCREEN TOGGLE
+          _buildSwitchTile(
+            "Hide Sensitive Content",
+            "Hide medication names on lock screen",
+            hideSensitive,
+            (val) {
+              _settingsBox.put('hideSensitive', val);
+              setState(() {});
+            },
+          ),
+
           const SizedBox(height: 10),
           _sectionTitle("Scheduled Summaries"),
           const SizedBox(height: 10),
