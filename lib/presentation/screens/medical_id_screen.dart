@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../auth/service/auth_service.dart';
-
-import '../../service/database/firestore_service.dart';
-import '../../data/repositories_impl/caregiver_repository_impl.dart';
 import '../../domain/entities/caregiver_entity.dart';
 
 class MedicalIdScreen extends StatefulWidget {
@@ -18,118 +15,156 @@ class MedicalIdScreen extends StatefulWidget {
 class _MedicalIdScreenState extends State<MedicalIdScreen> {
   late Box medicalBox;
   bool isEditing = false;
+  bool isLoading = false;
 
-  // ==========================
-  // MEDICAL ID CONTROLLERS
-  // ==========================
+  // Medical ID State
   String? selectedBloodType;
   final TextEditingController _allergyController = TextEditingController();
   List<String> allergies = [];
 
-  // ==========================
-  // CAREGIVER CONTROLLERS
-  // ==========================
-  final TextEditingController _caregiverNameController = TextEditingController();
-  final TextEditingController _caregiverEmailController = TextEditingController();
-  final TextEditingController _caregiverRelationController = TextEditingController();
+  // Caregiver State
+  final TextEditingController _caregiverNameController =
+      TextEditingController();
+  final TextEditingController _caregiverEmailController =
+      TextEditingController();
+  final TextEditingController _caregiverRelationController =
+      TextEditingController();
 
-  // ==========================
-  // SERVICES
-  // ==========================
   final AuthService _authService = AuthService();
-  final FirestoreService _firestoreService = FirestoreService();
-  late final CaregiverRepositoryImpl _caregiverRepository;
-
-  final List<String> bloodTypes = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+  final List<String> bloodTypes = [
+    "A+",
+    "A-",
+    "B+",
+    "B-",
+    "O+",
+    "O-",
+    "AB+",
+    "AB-"
+  ];
 
   @override
   void initState() {
     super.initState();
     medicalBox = Hive.box('medical_id_data');
-    _caregiverRepository = CaregiverRepositoryImpl(_firestoreService);
-    _loadSavedData();
-    _loadCaregiverFromFirestore();
+    _loadInitialData();
   }
 
-  // ==========================
-  // LOAD LOCAL DATA
-  // ==========================
-  void _loadSavedData() {
+  /// 1. Load data from Hive (fast) then Firestore (fresh)
+  Future<void> _loadInitialData() async {
+    // Load local cache first for immediate UI feedback
     setState(() {
       selectedBloodType = medicalBox.get('bloodType');
-      allergies = List<String>.from(
-          medicalBox.get('allergies', defaultValue: []));
+      allergies =
+          List<String>.from(medicalBox.get('allergies', defaultValue: []));
     });
-  }
 
-  // ==========================
-  // LOAD CAREGIVER FROM FIRESTORE
-  // ==========================
-  Future<void> _loadCaregiverFromFirestore() async {
     final user = _authService.currentUser;
     if (user == null) return;
 
-    final snapshot = await _firestoreService.caregivers
-        .where('userId', isEqualTo: user.uid)
-        .where('isActive', isEqualTo: true)
-        .limit(1)
-        .get();
+    setState(() => isLoading = true);
 
-    if (snapshot.docs.isNotEmpty) {
-      final data = snapshot.docs.first.data();
-      setState(() {
-        _caregiverNameController.text = data['name'] ?? '';
-        _caregiverEmailController.text = data['email'] ?? '';
-        _caregiverRelationController.text = data['relation'] ?? '';
-      });
+    try {
+      // Fetch Parent Document (Medical ID)
+      final medicalDoc = await FirebaseFirestore.instance
+          .collection('medical_ids')
+          .doc(user.uid)
+          .get();
+
+      if (medicalDoc.exists) {
+        final data = medicalDoc.data()!;
+        setState(() {
+          selectedBloodType = data['bloodType'];
+          // Ensure we cast the Firestore dynamic list to String list
+          allergies = List<String>.from(data['allergies'] ?? []);
+        });
+
+        // Update local cache with fresh data
+        medicalBox.put('bloodType', selectedBloodType);
+        medicalBox.put('allergies', allergies);
+      }
+
+      // Fetch Sub-collection (Caregiver)
+      final caregiverSnap = await FirebaseFirestore.instance
+          .collection('medical_ids')
+          .doc(user.uid)
+          .collection('caregivers')
+          .doc('primary_contact')
+          .get();
+
+      if (caregiverSnap.exists) {
+        final cData = caregiverSnap.data()!;
+        setState(() {
+          _caregiverNameController.text = cData['name'] ?? '';
+          _caregiverEmailController.text = cData['email'] ?? '';
+          _caregiverRelationController.text = cData['relation'] ?? '';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading data: $e");
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
-  // ==========================
-  // SAVE DATA
-  // ==========================
+  /// 2. Save Data to Firestore Sub-collection and Main Doc
   Future<void> _saveData() async {
+    final user = _authService.currentUser;
+    if (user == null) return;
 
-    // Caregiver required
     if (_caregiverNameController.text.isEmpty ||
-        _caregiverEmailController.text.isEmpty ||
-        _caregiverRelationController.text.isEmpty) {
-
+        _caregiverEmailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Caregiver is required.")),
+        const SnackBar(content: Text("Caregiver details are required.")),
       );
       return;
     }
 
-    // Save Medical ID locally
-    medicalBox.putAll({
-      'bloodType': selectedBloodType,
-      'allergies': allergies,
-    });
+    setState(() => isLoading = true);
 
-    // Save / Update Caregiver in Firestore
-    final user = _authService.currentUser;
+    try {
+      // Step A: Save to medical_ids (Main Doc)
+      await FirebaseFirestore.instance
+          .collection('medical_ids')
+          .doc(user.uid)
+          .set({
+        'userId': user.uid,
+        'bloodType': selectedBloodType,
+        'allergies': allergies, // Saving the list as a Firestore Array
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-    if (user != null) {
-      final caregiver = CaregiverEntity(
-        id: user.uid,
-        userId: user.uid,
-        name: _caregiverNameController.text,
-        email: _caregiverEmailController.text,
-        relation: _caregiverRelationController.text,
-        isActive: true,
-        addedAt: DateTime.now(),
+      // Step B: Save to medical_ids -> {uid} -> caregivers (Sub-collection)
+      await FirebaseFirestore.instance
+          .collection('medical_ids')
+          .doc(user.uid)
+          .collection('caregivers')
+          .doc('primary_contact')
+          .set({
+        'userId': user.uid,
+        'name': _caregiverNameController.text,
+        'email': _caregiverEmailController.text,
+        'relation': _caregiverRelationController.text,
+        'isActive': true,
+        'addedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Step C: Update Local Hive
+      await medicalBox.put('bloodType', selectedBloodType);
+      await medicalBox.put('allergies', allergies);
+
+      setState(() => isEditing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Medical ID saved successfully!")),
       );
-
-      await _caregiverRepository.addCaregiver(caregiver);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error saving: $e")),
+      );
+    } finally {
+      setState(() => isLoading = false);
     }
-
-    setState(() => isEditing = false);
   }
 
-  // ==========================
-  // UI
-  // ==========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -138,14 +173,25 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
         title: const Text("Medical ID",
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
+        elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(isEditing ? Icons.check : Icons.edit,
-                color: AppColors.primaryBlue),
-            onPressed: isEditing
-                ? _saveData
-                : () => setState(() => isEditing = true),
-          )
+          if (isLoading)
+            const Center(
+                child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            ))
+          else
+            IconButton(
+              icon: Icon(isEditing ? Icons.check : Icons.edit,
+                  color: AppColors.primaryBlue),
+              onPressed: isEditing
+                  ? _saveData
+                  : () => setState(() => isEditing = true),
+            )
         ],
       ),
       body: SingleChildScrollView(
@@ -155,11 +201,11 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
           children: [
             _sectionTitle("Core Information"),
             _buildBloodTypeDropdown(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
             _sectionTitle("Allergies"),
-            _buildAllergyInput(),
-            const SizedBox(height: 20),
-            _sectionTitle("Contact person (Required)"),
+            _buildAllergySection(),
+            const SizedBox(height: 25),
+            _sectionTitle("Emergency Contact (Sub-collection)"),
             _buildCaregiverFields(),
           ],
         ),
@@ -169,34 +215,32 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
 
   Widget _buildBloodTypeDropdown() {
     return DropdownButtonFormField<String>(
-      initialValue: selectedBloodType,
+      value: selectedBloodType,
       decoration: _inputDecoration("Blood Type", Icons.bloodtype),
       items: bloodTypes
-          .map((type) =>
-              DropdownMenuItem(value: type, child: Text(type)))
+          .map((type) => DropdownMenuItem(value: type, child: Text(type)))
           .toList(),
-      onChanged: isEditing
-          ? (val) => setState(() => selectedBloodType = val)
-          : null,
+      onChanged:
+          isEditing ? (val) => setState(() => selectedBloodType = val) : null,
     );
   }
 
-  Widget _buildAllergyInput() {
+  Widget _buildAllergySection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (isEditing)
+        if (isEditing) ...[
           TextField(
             controller: _allergyController,
-            decoration: _inputDecoration(
-                    "Add allergy and press enter",
-                    Icons.warning_amber)
-                .copyWith(
+            decoration:
+                _inputDecoration("Add allergy", Icons.warning_amber).copyWith(
               suffixIcon: IconButton(
-                icon: const Icon(Icons.add),
+                icon:
+                    const Icon(Icons.add_circle, color: AppColors.primaryBlue),
                 onPressed: () {
-                  if (_allergyController.text.isNotEmpty) {
+                  if (_allergyController.text.trim().isNotEmpty) {
                     setState(() {
-                      allergies.add(_allergyController.text);
+                      allergies.add(_allergyController.text.trim());
                       _allergyController.clear();
                     });
                   }
@@ -204,27 +248,37 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
               ),
             ),
             onSubmitted: (val) {
-              if (val.isNotEmpty) {
+              if (val.trim().isNotEmpty) {
                 setState(() {
-                  allergies.add(val);
+                  allergies.add(val.trim());
                   _allergyController.clear();
                 });
               }
             },
           ),
+          const SizedBox(height: 12),
+        ],
         Wrap(
           spacing: 8,
+          runSpacing: 4,
           children: allergies
               .map((a) => Chip(
                     label: Text(a),
                     onDeleted: isEditing
                         ? () => setState(() => allergies.remove(a))
                         : null,
-                    backgroundColor:
-                        AppColors.primaryBlue.withOpacity(0.1),
+                    deleteIconColor: Colors.redAccent,
+                    backgroundColor: AppColors.primaryBlue.withOpacity(0.1),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ))
               .toList(),
         ),
+        if (allergies.isEmpty && !isEditing)
+          const Text("No allergies listed",
+              style:
+                  TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
       ],
     );
   }
@@ -232,51 +286,48 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
   Widget _buildCaregiverFields() {
     return Column(
       children: [
-        _buildEditField(
-            _caregiverNameController, "Caregiver Name", Icons.person),
-        _buildEditField(
-            _caregiverEmailController, "Caregiver Email", Icons.email,
+        _buildEditField(_caregiverNameController, "Name", Icons.person),
+        _buildEditField(_caregiverEmailController, "Email", Icons.email,
             inputType: TextInputType.emailAddress),
         _buildEditField(
-            _caregiverRelationController,
-            "Relation (e.g. Daughter, Son)",
-            Icons.family_restroom),
+            _caregiverRelationController, "Relation", Icons.family_restroom),
       ],
     );
   }
 
   Widget _sectionTitle(String title) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, left: 5),
-        child: Text(title,
+        padding: const EdgeInsets.only(bottom: 10, left: 4),
+        child: Text(title.toUpperCase(),
             style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Colors.grey)),
+                fontSize: 12,
+                color: Colors.blueGrey,
+                letterSpacing: 1.1)),
       );
 
-  InputDecoration _inputDecoration(
-          String label, IconData icon) =>
+  InputDecoration _inputDecoration(String label, IconData icon) =>
       InputDecoration(
         labelText: label,
-        prefixIcon:
-            Icon(icon, color: AppColors.primaryBlue),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15)),
-        enabled: isEditing,
+        prefixIcon: Icon(icon, color: AppColors.primaryBlue),
+        filled: !isEditing,
+        fillColor:
+            isEditing ? Colors.transparent : Colors.grey.withOpacity(0.05),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
       );
 
   Widget _buildEditField(
-      TextEditingController controller,
-      String label,
-      IconData icon,
-      {TextInputType inputType =
-          TextInputType.text}) {
+      TextEditingController controller, String label, IconData icon,
+      {TextInputType inputType = TextInputType.text}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         controller: controller,
         keyboardType: inputType,
-        decoration:
-            _inputDecoration(label, icon),
+        decoration: _inputDecoration(label, icon),
         readOnly: !isEditing,
       ),
     );
