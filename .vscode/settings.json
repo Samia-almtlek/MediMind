@@ -1,5 +1,6 @@
 {
   "java.configuration.updateBuildConfiguration": "interactive",
+  "files.autoSave": "afterDelay",
   "FSharp.suggestGitignore": false,
   "cmake.ignoreCMakeListsMissing": true,
 

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/global_data.dart';
@@ -18,10 +21,15 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime today = DateTime.now();
   //dit is nu een lege lijst om later te vullen via de API of db
   List<Medication> activeMeds = [];
+  List<TargetFocus> targets = [];
+  final GlobalKey keyMenu = GlobalKey();
+  final GlobalKey keyCalendar = GlobalKey();
+  final GlobalKey keyCheckmark = GlobalKey();
 
   final ScrollController _scrollController = ScrollController(
     initialScrollOffset: 500 * 68.0 - 150,
   );
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _medicationsSubscription;
 
   String _getMonthName(DateTime date) {
     List<String> months = [
@@ -45,10 +53,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadInitialData();
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _checkFirstTime();
+    });
   }
 
   void _loadInitialData() {
-    FirebaseFirestore.instance
+    _medicationsSubscription = FirebaseFirestore.instance
         .collection('user_medications')
         .snapshots()
         .listen((snapshot) {
@@ -56,11 +68,134 @@ class _HomeScreenState extends State<HomeScreen> {
         print(
             "Firestore Data: ${doc.data()}"); // Check your debug console for this!
       }
+      if (!mounted) return;
       setState(() {
         userAddedMeds =
             snapshot.docs.map((doc) => Medication.fromFirestore(doc)).toList();
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _medicationsSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('home_tour_seen') ?? false;
+    if (!mounted || seen) return;
+    showTutorial();
+    await prefs.setBool('home_tour_seen', true);
+  }
+
+  void showTutorial() {
+    if (!mounted) return;
+    targets = [];
+
+    targets.add(
+      TargetFocus(
+        identify: "Target Menu",
+        keyTarget: keyMenu,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return _buildTutorialCard(
+                title: "Manage your meds",
+                message: "Click here to delete or edit medications.",
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    targets.add(
+      TargetFocus(
+        identify: "Target Calendar",
+        keyTarget: keyCalendar,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return _buildTutorialCard(
+                title: "Pick a day",
+                message:
+                    "Use this horizontal calendar to navigate through your medication schedule.",
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    targets.add(
+      TargetFocus(
+        identify: "Target Checkmark",
+        keyTarget: keyCheckmark,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return _buildTutorialCard(
+                title: "Mark as taken",
+                message:
+                    "Check this box when you have taken your medication for the selected date.",
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      textSkip: "SKIP",
+      paddingFocus: 6,
+      opacityShadow: 0.78,
+      onFinish: () => print("Tour finished"),
+    ).show(context: context);
+  }
+
+  Widget _buildTutorialCard({
+    required String title,
+    required String message,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 320),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.iconGrey.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 19,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
@@ -285,6 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            key: keyMenu,
             icon: const Icon(Icons.more_horiz, color: Colors.black),
             onPressed: _showMoreActions,
           ),
@@ -306,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          _buildHorizontalCalendar(),
+          _buildHorizontalCalendar(calendarTileKey: keyCalendar),
 
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -346,7 +482,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Builds a horizontal calendar automatically
-  Widget _buildHorizontalCalendar() {
+  Widget _buildHorizontalCalendar({Key? calendarTileKey}) {
     return SizedBox(
       height: 100,
       child: ListView.builder(
@@ -370,6 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
             child: Container(
+              key: index == 500 ? calendarTileKey : null,
               width: 60,
               margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
@@ -453,6 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Transform.scale(
                 scale: 1.2,
                 child: Checkbox(
+                  key: index == 0 ? keyCheckmark : null,
                   //check if the current date (at midnight) is in the completedDates list for this medication
                   value: med.completedDates
                       .any((d) => DateUtils.isSameDay(d, selectedDate)),

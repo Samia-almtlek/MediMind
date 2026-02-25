@@ -7,6 +7,8 @@ import 'package:medimind/service/chatbot/chat_memory_service.dart';
 import 'package:medimind/service/chatbot/chatbot_prompts.dart';
 import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
 import 'package:medimind/service/chatbot/lm_studio_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
 import '../../core/widgets/speaker_button.dart';
 
@@ -27,6 +29,9 @@ class _ChatScreenState extends State<ChatScreen> {
   late final ChatMemoryService _chatMemoryService;
   late final LmStudioChatClient _chatClient;
   String? _sessionId;
+  final GlobalKey _keyModeSwitch = GlobalKey();
+  final GlobalKey _keyMessages = GlobalKey();
+  final GlobalKey _keyInput = GlobalKey();
   // Toggle between 'Quick' and 'Detailed' models
   bool _isDetailedMode = false;
   bool _isTyping = false; // To show typing indicator
@@ -115,18 +120,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return conversationContext.substring(conversationContext.length - 300);
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   @override
   void initState() {
     super.initState();
@@ -141,6 +134,109 @@ class _ChatScreenState extends State<ChatScreen> {
       maxProductsToScan: 2000,
     );
     _initializeSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  Future<void> _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('chat_tour_seen') ?? false;
+    if (seen || !mounted) return;
+    _showTutorial();
+    await prefs.setBool('chat_tour_seen', true);
+  }
+
+  void _showTutorial() {
+    final targets = <TargetFocus>[
+      _buildTarget(
+        identify: 'chat_mode',
+        key: _keyModeSwitch,
+        title: 'Quick / Detailed mode',
+        message: 'Switch between fast concise responses and more detailed medical explanations.',
+        align: ContentAlign.bottom,
+      ),
+      _buildTarget(
+        identify: 'chat_messages',
+        key: _keyMessages,
+        title: 'Conversation area',
+        message: 'Your messages and AI responses appear here in chronological order.',
+        align: ContentAlign.top,
+      ),
+      _buildTarget(
+        identify: 'chat_input',
+        key: _keyInput,
+        title: 'Ask your question',
+        message: 'Type your medication question here and press send.',
+        align: ContentAlign.top,
+      ),
+    ];
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      opacityShadow: 0.78,
+      textSkip: 'SKIP',
+      paddingFocus: 8,
+    ).show(context: context);
+  }
+
+  TargetFocus _buildTarget({
+    required String identify,
+    required GlobalKey key,
+    required String title,
+    required String message,
+    required ContentAlign align,
+  }) {
+    return TargetFocus(
+      identify: identify,
+      keyTarget: key,
+      contents: [
+        TargetContent(
+          align: align,
+          builder: (_, __) => Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.iconGrey.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _initializeSession() async {
@@ -378,7 +474,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (index == _messages.length) {
                   return _buildTypingIndicator();
                 } else {
-                  return _buildChatBubble(_messages[index]);
+                  return _buildChatBubble(
+                    _messages[index],
+                    bubbleKey: index == 0 ? _keyMessages : null,
+                  );
                 }
               },
             ),
@@ -419,6 +518,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildToggleSwitch() {
     return Container(
+      key: _keyModeSwitch,
       margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
@@ -475,11 +575,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildChatBubble(Map<String, dynamic> msg) {
+  Widget _buildChatBubble(Map<String, dynamic> msg, {Key? bubbleKey}) {
     bool isUser = msg["isUser"];
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
+        key: bubbleKey,
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
@@ -526,6 +627,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInputArea() {
     return Container(
+      key: _keyInput,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
       decoration: const BoxDecoration(
         color: Colors.white,
