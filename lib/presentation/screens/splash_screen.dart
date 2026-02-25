@@ -17,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const MainScreen()),
+        MaterialPageRoute(builder: (context) => MainScreen()),
       );
     });
   }
@@ -32,7 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             Image.asset('assets/images/logo.png', width: 150),
             const SizedBox(height: 24),
-            const CircularProgressIndicator(
+            CircularProgressIndicator(
               valueColor:
                   AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
             ),
