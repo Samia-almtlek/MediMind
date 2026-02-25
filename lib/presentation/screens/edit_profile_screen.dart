@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,7 +16,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+
+  // New Controllers for Password logic
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
@@ -30,29 +33,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _updateProfile() async {
+    final String newPassword = _newPasswordController.text.trim();
+    final String currentPassword = _currentPasswordController.text.trim();
+
+    // Validation: If they typed a new password, they MUST provide the current one
+    if (newPassword.isNotEmpty && currentPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text("Please enter your current password to set a new one.")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      // 1. Update the photoURL if a new image was picked
+      // 1. Re-authenticate if password change is requested
+      if (newPassword.isNotEmpty) {
+        AuthCredential credential = EmailAuthProvider.credential(
+          email: user!.email!,
+          password: currentPassword,
+        );
+
+        // This validates the old password
+        await user?.reauthenticateWithCredential(credential);
+        // This sets the new password
+        await user?.updatePassword(newPassword);
+      }
+
+      // 2. Update the photoURL if a new image was picked
       if (_imageFile != null) {
-        // for the actual app the image should be uploaded in Firebase Storage and the returned URL should be saved in FirebaseAuth. But for now we save the local path so the app knows which file to load.
         await user?.updatePhotoURL(_imageFile!.path);
       }
 
-      // 2. Update Display Name
+      // 3. Update Display Name
       final String newName = _nameController.text.trim();
       if (newName != user?.displayName) {
         await user?.updateDisplayName(newName);
       }
-      // 3. Forces a reload of the user to ensure the latest data is fetched from Firebase
+
+      // 4. Update Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
           .update({
         'fullName': newName,
-        // If you update the photoURL, add it here too:
-        // 'profile_picture': user?.photoURL,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
       await user?.reload();
 
       if (!mounted) return;
@@ -62,10 +90,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message = "An error occurred";
-      if (e.code == 'requires-recent-login')
+      if (e.code == 'wrong-password') {
+        message = "The current password you entered is incorrect.";
+      } else if (e.code == 'requires-recent-login') {
         message = "Please re-login to change sensitive data.";
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      } else if (e.code == 'weak-password') {
+        message = "The new password is too weak.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.redAccent));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -89,7 +122,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               style: TextStyle(color: Colors.black))),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
+              // Added scroll view to prevent overflow with keyboard
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
@@ -115,9 +149,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _buildTextField(
                       _emailController, "Email", Icons.email_outlined,
                       inputType: TextInputType.emailAddress),
-                  _buildTextField(_passwordController,
-                      "New Password (optional)", Icons.lock_outline,
+
+                  const Divider(height: 40),
+                  const Text("Change Password",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+
+                  // NEW: Current Password Field
+                  _buildTextField(_currentPasswordController,
+                      "Current Password", Icons.lock_reset_outlined,
                       isPassword: true),
+
+                  // NEW: New Password Field
+                  _buildTextField(_newPasswordController, "New Password",
+                      Icons.lock_outline,
+                      isPassword: true),
+
                   const SizedBox(height: 30),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(

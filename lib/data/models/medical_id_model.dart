@@ -1,89 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'caregiver_model.dart';
 
-/// 1. The Blood Type Enum
-enum BloodType {
-  aPositive('A+'),
-  aNegative('A-'),
-  bPositive('B+'),
-  bNegative('B-'),
-  oPositive('O+'),
-  oNegative('O-'),
-  abPositive('AB+'),
-  abNegative('AB-');
-
-  final String label;
-  const BloodType(this.label);
-
-  // Helper to convert String from Firebase back to Enum
-  static BloodType fromString(String label) {
-    return BloodType.values.firstWhere(
-      (e) => e.label == label,
-      orElse: () => BloodType.oPositive,
-    );
-  }
-}
-
-/// 2. The Emergency Contact Sub-Class
-class EmergencyContact {
-  final String name;
-  final String phone;
-  final String email;
-
-  EmergencyContact({
-    required this.name,
-    required this.phone,
-    required this.email,
-  });
-
-  Map<String, dynamic> toMap() => {
-        'name': name,
-        'phone': phone,
-        'email': email,
-      };
-
-  factory EmergencyContact.fromMap(Map<String, dynamic> map) {
-    return EmergencyContact(
-      name: map['name'] ?? '',
-      phone: map['phone'] ?? '',
-      email: map['email'] ?? '',
-    );
-  }
-}
-
-/// 3. The Main Medical ID Model
-class MedicalId {
+class MedicalIdModel {
+  final String id;
   final String userId;
-  final BloodType bloodType;
+  final String bloodType;
   final List<String> allergies;
-  final EmergencyContact emergencyContact;
+  final List<CaregiverModel> caregivers; // The linked sub-collection data
 
-  MedicalId({
+  MedicalIdModel({
+    required this.id,
     required this.userId,
     required this.bloodType,
     required this.allergies,
-    required this.emergencyContact,
+    this.caregivers = const [],
   });
 
-  // Convert Firebase Document to this Model
-  factory MedicalId.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
-    return MedicalId(
+  factory MedicalIdModel.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc, 
+    List<CaregiverModel> caregivers,
+  ) {
+    final data = doc.data()!;
+    return MedicalIdModel(
+      id: doc.id,
       userId: data['userId'] ?? '',
-      bloodType: BloodType.fromString(data['bloodType'] ?? 'O+'),
+      bloodType: data['bloodType'] ?? '',
       allergies: List<String>.from(data['allergies'] ?? []),
-      emergencyContact:
-          EmergencyContact.fromMap(data['emergencyContact'] ?? {}),
+      caregivers: caregivers,
     );
   }
 
-  // Convert this Model to a Map for Firebase
   Map<String, dynamic> toFirestore() {
     return {
       'userId': userId,
-      'bloodType': bloodType.label,
+      'bloodType': bloodType,
       'allergies': allergies,
-      'emergencyContact': emergencyContact.toMap(),
+      // Caregivers are not stored here; they live in the sub-collection
     };
   }
 }

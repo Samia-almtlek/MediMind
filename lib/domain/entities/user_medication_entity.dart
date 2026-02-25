@@ -11,7 +11,7 @@ class UserMedicationEntity {
   final bool isActive;
   final bool aangemaaktViaOCR;
   final List<String> intakeTimes;
-    // 🆕 STOCK FIELDS
+  // 🆕 STOCK FIELDS
   final int initialStock;
   final int currentStock;
   final int lowStockThresholdDays;
@@ -29,8 +29,8 @@ class UserMedicationEntity {
     this.instructions,
     required this.isActive,
     required this.aangemaaktViaOCR,
-     required this.intakeTimes,
-         // 🆕
+    required this.intakeTimes,
+    // 🆕
     required this.initialStock,
     required this.currentStock,
     this.lowStockThresholdDays = 3,

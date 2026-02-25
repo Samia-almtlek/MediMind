@@ -15,14 +15,17 @@ class CaregiverModel extends CaregiverEntity {
   factory CaregiverModel.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
+    return CaregiverModel.fromMap(data, doc.id);
+  }
 
+  factory CaregiverModel.fromMap(Map<String, dynamic> data, String id) {
     return CaregiverModel(
-      id: doc.id,
-      userId: data['userId'],
-      name: data['name'],
-      email: data['email'],
-      relation: data['relation'],
-      isActive: data['isActive'],
+      id: id,
+      userId: data['userId'] ?? '',
+      name: data['name'] ?? '',
+      email: data['email'] ?? '',
+      relation: data['relation'] ?? '',
+      isActive: data['isActive'] ?? false,
       addedAt: (data['addedAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -34,7 +37,7 @@ class CaregiverModel extends CaregiverEntity {
       'email': email,
       'relation': relation,
       'isActive': isActive,
-      'addedAt': addedAt,
+      'addedAt': addedAt ?? FieldValue.serverTimestamp(),
     };
   }
 }

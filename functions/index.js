@@ -71,10 +71,12 @@ MediMind Team`,
               doseId: doc.id,
               medicatieId: dose.medicatieId,
               userId: userId,
-              caregiverId: caregiverDoc.id, // ✅ Correct independent ID
+              caregiverId: "primary_contact", 
+              medicalId: userId,
               caregiverEmail: caregiver.email,
               medicationName: medicationName,
               escalatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              path: `medical_ids/${userId}/caregivers/primary_contact`,
             });
           }
 

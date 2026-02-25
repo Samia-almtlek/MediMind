@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import 'success_screen.dart';
-import '../../domain/models/medication.dart';
+import '../../data/repositories_impl/user_medication_repository_impl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../service/database/firestore_service.dart';
+import '../../domain/entities/user_medication_entity.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../service/notifications/dose_generation_service.dart';
+import '../../core/widgets/speaker_button.dart';
 
 class TreatmentDurationScreen extends StatefulWidget {
   final String medicationName;
   final String dosage;
   final String? notes;
-  final Medication? medicationToEdit;
-  final bool isFromScanner;
 
-  const TreatmentDurationScreen({
-    super.key,
+  TreatmentDurationScreen({
     required this.medicationName,
     required this.dosage,
     this.notes,
-    this.medicationToEdit,
-    this.isFromScanner = false,
   });
 
   @override
@@ -30,48 +29,9 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   String selectedDuration = "7 days";
   int customDays = 0;
   int frequency = 1;
-  List<TimeOfDay> selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
+  int? currentStock; // 🆕 STOCK
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.medicationToEdit != null) {
-      _loadExistingData();
-    }
-  }
-
-  void _loadExistingData() {
-    final med = widget.medicationToEdit!;
-    // Extract frequency (e.g., "3x per day" -> 3)
-    frequency = int.tryParse(med.instructions.split(' ')[0]) ?? 1;
-
-    // Parse times from instructions "Times: 8:00 AM, 4:00 PM..."
-    if (med.instructions.contains("Times:")) {
-      try {
-        final timesPart = med.instructions.split("Times: ")[1].split(".")[0];
-        final timesArray = timesPart.split(", ");
-        selectedTimes = timesArray.map((t) {
-          final parts = t.trim().split(" "); // ["8:00", "AM"]
-          final timeParts = parts[0].split(":");
-          int hour = int.parse(timeParts[0]);
-          int minute = int.parse(timeParts[1]);
-          if (parts[1] == "PM" && hour < 12) hour += 12;
-          if (parts[1] == "AM" && hour == 12) hour = 0;
-          return TimeOfDay(hour: hour, minute: minute);
-        }).toList();
-      } catch (e) {
-        selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
-      }
-    }
-
-    final daysDiff = med.endDate.difference(med.startDate).inDays + 1;
-    if ([7, 14, 30].contains(daysDiff)) {
-      selectedDuration = "$daysDiff days";
-    } else {
-      selectedDuration = "Custom";
-      customDays = daysDiff;
-    }
-  }
+  List<TimeOfDay> selectedTimes = [TimeOfDay(hour: 8, minute: 0)];
 
   void _updateTimeSuggestions(int newFrequency) {
     setState(() {
@@ -90,61 +50,30 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
       context: context,
       initialTime: selectedTimes[index],
     );
-    if (picked != null) setState(() => selectedTimes[index] = picked);
+
+    if (picked != null) {
+      setState(() {
+        selectedTimes[index] = picked;
+      });
+    }
   }
 
-  Future<void> _saveMedication() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
+  String _buildTreatmentSummary() {
     int totalDays = selectedDuration == "Custom"
         ? customDays
         : int.parse(selectedDuration.split(' ')[0]);
 
-    DateTime startDate = DateTime.now();
-    DateTime endDate = startDate.add(Duration(days: totalDays - 1));
+    String summary = "Treatment plan for ${widget.medicationName}. "
+        "Dosage ${widget.dosage}. "
+        "$frequency times per day. "
+        "For $totalDays days. "
+        "Total doses ${totalDays * frequency}. ";
 
-    String formattedTimes =
-        selectedTimes.map((t) => t.format(context)).join(', ');
-    String instructionsText =
-        "Times: $formattedTimes. Notes: ${widget.notes ?? ''}";
-
-    final Map<String, dynamic> data = {
-      'userId': user.uid, // Ensures privacy per user
-      'name': widget.medicationName,
-      'dosage': widget.dosage,
-      'frequencyPerDay': frequency,
-      'startDate': Timestamp.fromDate(startDate),
-      'endDate': Timestamp.fromDate(endDate),
-      'instructions': instructionsText,
-      'completedDoseIds': widget.medicationToEdit?.completedDoseIds ??
-          [], // Preserves existing progress
-      'isActive': true,
-    };
-
-    try {
-      if (widget.medicationToEdit != null) {
-        await FirebaseFirestore.instance
-            .collection('user_medications')
-            .doc(widget.medicationToEdit!.id)
-            .update(data);
-      } else {
-        await FirebaseFirestore.instance
-            .collection('user_medications')
-            .add(data);
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              SuccessScreen(medicationName: widget.medicationName),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+    if (widget.notes != null && widget.notes!.isNotEmpty) {
+      summary += "Notes: ${widget.notes}.";
     }
+
+    return summary;
   }
 
   @override
@@ -152,40 +81,150 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.medicationToEdit != null
-            ? "Edit Schedule"
-            : "Treatment Logic"),
+        title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
-        foregroundColor: Colors.black,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Duration",
+            Text("Duration",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             _buildDurationGrid(),
             if (selectedDuration == "Custom") _buildCustomDaysInput(),
-            const SizedBox(height: 30),
-            const Text("Daily Frequency",
+
+            SizedBox(height: 30),
+
+            Text("Daily Frequency",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             _buildFrequencyDropdown(),
-            const SizedBox(height: 20),
+
+            SizedBox(height: 20),
+
+            Text("Intake Times",
+                style: TextStyle(fontSize: 16, color: Colors.grey)),
             _buildTimePickerList(),
-            const SizedBox(height: 30),
-            _buildSummaryCard(),
-            const SizedBox(height: 30),
+
+            SizedBox(height: 30),
+
+            // 🆕 STOCK INPUT
+            Text("Current Stock",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            TextField(
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: "How many tablets do you currently have?",
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  currentStock = int.tryParse(val);
+                });
+              },
+            ),
+
+            SizedBox(height: 30),
+
+            _buildCenteredSummary(),
+
+            SizedBox(height: 20),
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
-                minimumSize: const Size(double.infinity, 55),
+                minimumSize: Size(double.infinity, 55),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: _saveMedication,
-              child: const Text("Confirm & Save",
+              onPressed: () async {
+                int totalDays = selectedDuration == "Custom"
+                    ? customDays
+                    : int.parse(selectedDuration.split(' ')[0]);
+
+                DateTime startDate = DateTime.now();
+                DateTime calculatedEndDate =
+                    startDate.add(Duration(days: totalDays - 1));
+
+                final repository =
+                    UserMedicationRepositoryImpl(FirestoreService());
+
+                try {
+                  final User? user = FirebaseAuth.instance.currentUser;
+                  if (user == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              "You must be logged in to save medication.")),
+                    );
+                    return;
+                  }
+
+                  if (currentStock == null || currentStock! <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            "Please enter the number of tablets you have."),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final String uid = user.uid;
+
+                  final newMedication = UserMedicationEntity(
+                    id: FirebaseFirestore.instance
+                        .collection('user_medications')
+                        .doc()
+                        .id,
+                    userId: uid,
+                    productId: "",
+                    name: widget.medicationName,
+                    dosage: widget.dosage,
+                    frequencyPerDay: frequency,
+                    startDate: startDate,
+                    endDate: calculatedEndDate,
+                    instructions: widget.notes,
+                    intakeTimes: selectedTimes
+                        .map((t) =>
+                            "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}")
+                        .toList(),
+                    isActive: true,
+                    aangemaaktViaOCR: false,
+
+                    // 🆕 STOCK VALUES
+                    initialStock: currentStock!,
+                    currentStock: currentStock!,
+                    lowStockThresholdDays: 3,
+                    lastStockAlertAt: null,
+                  );
+
+                  await repository.addUserMedication(newMedication);
+
+                  final generator = DoseGenerationService();
+                  await generator.generateDoses(newMedication);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SuccessScreen(medicationName: widget.medicationName),
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error saving medication: $e")),
+                  );
+                }
+              },
+              child: Text("Confirm & Save",
                   style: TextStyle(color: Colors.white, fontSize: 18)),
             ),
           ],
@@ -244,35 +283,51 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
           title: Text("Dose ${index + 1}"),
           trailing: TextButton(
             onPressed: () => _selectTime(index),
-            child: Text(selectedTimes[index].format(context),
-                style: const TextStyle(
-                    fontSize: 18, color: AppColors.primaryBlue)),
+            child: Text(
+              selectedTimes[index].format(context),
+              style: TextStyle(fontSize: 18, color: AppColors.primaryBlue),
+            ),
           ),
         );
       }),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildCenteredSummary() {
     int totalDays = selectedDuration == "Custom"
         ? customDays
         : int.parse(selectedDuration.split(' ')[0]);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.lightTeal.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.lightTeal),
-      ),
-      child: Column(
-        children: [
-          const Text("Schedule Overview",
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          const Divider(),
-          Text("${widget.medicationName} - ${widget.dosage}"),
-          Text("Total Doses: ${totalDays * frequency}"),
-        ],
+
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.lightTeal.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: AppColors.lightTeal),
+        ),
+        child: Column(
+          children: [
+            Text(
+              "Schedule Overview",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            SpeakerButton(
+              text: _buildTreatmentSummary(),
+              size: 22,
+              color: AppColors.primaryBlue,
+            ),
+            Divider(),
+            Text("Medication: ${widget.medicationName} (${widget.dosage})"),
+            Text("Frequency: $frequency times daily"),
+            Text("Duration: $totalDays days"),
+            Text("Total Doses: ${totalDays * frequency}",
+                style: TextStyle(
+                    color: AppColors.primaryBlue, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
