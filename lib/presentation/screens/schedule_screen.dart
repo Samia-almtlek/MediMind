@@ -1,12 +1,125 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
 import 'package:medimind/domain/models/medication.dart';
 
-class ScheduleScreen extends StatelessWidget {
+class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
+
+  @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  final GlobalKey _keyTitle = GlobalKey();
+  final GlobalKey _keyMonth = GlobalKey();
+  final GlobalKey _keyCard = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  Future<void> _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('schedule_tour_seen') ?? false;
+    if (seen || !mounted) return;
+    _showTutorial();
+    await prefs.setBool('schedule_tour_seen', true);
+  }
+
+  void _showTutorial() {
+    final targets = <TargetFocus>[];
+
+    targets.add(_buildTarget(
+      identify: 'schedule_title',
+      key: _keyTitle,
+      title: 'Treatment Plan',
+      message:
+          'This page groups your medications by month and shows each planned intake time.',
+      align: ContentAlign.bottom,
+    ));
+
+    if (_keyMonth.currentContext != null) {
+      targets.add(_buildTarget(
+        identify: 'schedule_month',
+        key: _keyMonth,
+        title: 'Monthly groups',
+        message:
+            'Each section represents a month to help you review your treatment timeline.',
+        align: ContentAlign.bottom,
+      ));
+    }
+
+    if (_keyCard.currentContext != null) {
+      targets.add(_buildTarget(
+        identify: 'schedule_card',
+        key: _keyCard,
+        title: 'Medication card',
+        message:
+            'Here you can see medication name, dosage, planned time, and status (Active/Finished).',
+        align: ContentAlign.top,
+      ));
+    }
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      opacityShadow: 0.78,
+      textSkip: 'SKIP',
+      paddingFocus: 8,
+    ).show(context: context);
+  }
+
+  TargetFocus _buildTarget({
+    required String identify,
+    required GlobalKey key,
+    required String title,
+    required String message,
+    required ContentAlign align,
+  }) {
+    return TargetFocus(
+      identify: identify,
+      keyTarget: key,
+      contents: [
+        TargetContent(
+          align: align,
+          builder: (_, __) => Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.iconGrey.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +132,8 @@ class ScheduleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
+          key: _keyTitle,
           "Treatment Plan",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
@@ -125,6 +239,7 @@ class ScheduleScreen extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
               child: Text(
+                key: index == 0 ? _keyMonth : null,
                 month,
                 style: const TextStyle(
                     fontSize: 20,
@@ -132,16 +247,21 @@ class ScheduleScreen extends StatelessWidget {
                     color: AppColors.iconGrey),
               ),
             ),
-            ...medsInMonth.map((med) => _buildTreatmentCard(med)),
+            ...medsInMonth.asMap().entries.map(
+                  (entry) => _buildTreatmentCard(
+                    entry.value,
+                    itemKey: (index == 0 && entry.key == 0) ? _keyCard : null,
+                  ),
+                ),
           ],
         );
       },
     );
   }
 
-  Widget _buildTreatmentCard(Medication med) {
-    final DateTime today = DateTime.now();
-    final DateTime todayDateOnly = DateTime(today.year, today.month, today.day);
+  Widget _buildTreatmentCard(Medication med, {Key? itemKey}) {
+    final DateTime today =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     final DateTime endDateOnly =
         DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
 
@@ -156,6 +276,7 @@ class ScheduleScreen extends StatelessWidget {
         "${DateFormat('MMM d').format(med.startDate)} - ${DateFormat('MMM d, yyyy').format(med.endDate)}";
 
     return Container(
+      key: itemKey,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
