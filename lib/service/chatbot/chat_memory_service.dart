@@ -54,9 +54,77 @@ class ChatMemoryService {
       'title': 'MediMind Chat',
       'summary': '',
       'summaryUpdatedAt': now,
+      'activeHit': null,
+      'resolvedHits': <String>[],
     });
 
     return created.id;
+  }
+
+  Future<List<String>> getResolvedHits(String sessionId) async {
+    final doc = await _sessions.doc(sessionId).get();
+    final data = doc.data();
+    if (data == null) {
+      return const [];
+    }
+
+    final activeHitRaw = data['activeHit'];
+    final activeHit = activeHitRaw is String ? activeHitRaw.trim() : '';
+
+    final resolvedRaw = data['resolvedHits'];
+    final resolved = <String>[];
+    if (resolvedRaw is List) {
+      for (final value in resolvedRaw) {
+        if (value is String && value.trim().isNotEmpty) {
+          resolved.add(value.trim());
+        }
+      }
+    }
+
+    final deduped = <String>[];
+    if (activeHit.isNotEmpty) {
+      deduped.add(activeHit);
+    }
+
+    for (final hit in resolved) {
+      if (!deduped.contains(hit)) {
+        deduped.add(hit);
+      }
+    }
+
+    return deduped;
+  }
+
+  Future<void> recordResolvedHit(
+    String sessionId,
+    String hit, {
+    int maxHits = 10,
+  }) async {
+    final normalizedHit = hit.trim().toLowerCase();
+    if (normalizedHit.isEmpty) {
+      return;
+    }
+
+    final existingHits = await getResolvedHits(sessionId);
+    final merged = <String>[normalizedHit];
+    for (final existing in existingHits) {
+      final normalizedExisting = existing.trim().toLowerCase();
+      if (normalizedExisting.isEmpty || merged.contains(normalizedExisting)) {
+        continue;
+      }
+      merged.add(normalizedExisting);
+      if (merged.length >= maxHits) {
+        break;
+      }
+    }
+
+    await _sessions.doc(sessionId).set(
+      {
+        'activeHit': normalizedHit,
+        'resolvedHits': merged,
+      },
+      SetOptions(merge: true),
+    );
   }
 
   Future<void> saveMessage({
