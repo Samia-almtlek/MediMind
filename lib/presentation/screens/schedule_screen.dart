@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
-import '../../utils/global_data.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../../utils/app_colors.dart';
 import 'package:medimind/domain/models/medication.dart';
 
 class ScheduleScreen extends StatelessWidget {
@@ -9,11 +10,11 @@ class ScheduleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Process the global list to split multiple times into individual entries
-    final List<Medication> flattenedMeds =
-        _getFlattenedMedicationList(userAddedMeds);
-    final Map<String, List<Medication>> groupedMeds =
-        _groupMedsByMonth(flattenedMeds);
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return const Scaffold(body: Center(child: Text("Please log in")));
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
@@ -26,21 +27,46 @@ class ScheduleScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: flattenedMeds.isEmpty
-          ? _buildEmptyState()
-          : _buildGroupedTreatmentList(groupedMeds),
+      body: StreamBuilder<QuerySnapshot>(
+        // Listen only to the current user's medications
+        stream: FirebaseFirestore.instance
+            .collection('user_medications')
+            .where('userId', isEqualTo: user.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          // Convert Firestore docs to Medication objects
+          final List<Medication> rawMeds = snapshot.data!.docs
+              .map((doc) => Medication.fromFirestore(doc))
+              .toList();
+
+          // Flatten the list (split multiple times into separate entries)
+          final List<Medication> flattenedMeds =
+              _getFlattenedMedicationList(rawMeds);
+
+          // Group them by month for the UI
+          final Map<String, List<Medication>> groupedMeds =
+              _groupMedsByMonth(flattenedMeds);
+
+          return _buildGroupedTreatmentList(groupedMeds);
+        },
+      ),
     );
   }
 
-  /// NEW: Helper to turn 1 Medication with 3 times into 3 Medication entries for display
   List<Medication> _getFlattenedMedicationList(List<Medication> meds) {
     List<Medication> results = [];
     for (var med in meds) {
-      // Extract times from: "Times: 8:00 AM, 4:00 PM. Notes: ..."
+      // Logic matches TreatmentDurationScreen's storage format
       String timePart =
           med.instructions.split("Notes:")[0].replaceAll("Times: ", "").trim();
-
-      // Split by comma and clean up whitespace
       List<String> allTimes = timePart
           .split(',')
           .map((t) => t.trim())
@@ -48,18 +74,19 @@ class ScheduleScreen extends StatelessWidget {
           .toList();
 
       if (allTimes.isEmpty) {
-        results.add(med); // Fallback if parsing fails
+        results.add(med);
       } else {
         for (String t in allTimes) {
           results.add(
             Medication(
               id: med.id,
+              userId: med.userId,
               name: med.name,
               dosage: med.dosage,
-              time: t, // Set the specific time for this card
+              time: t,
               startDate: med.startDate,
               endDate: med.endDate,
-              completedDates: med.completedDates,
+              completedDoseIds: med.completedDoseIds,
               instructions: med.instructions,
               frequency: med.frequency,
             ),
@@ -72,6 +99,9 @@ class ScheduleScreen extends StatelessWidget {
 
   Map<String, List<Medication>> _groupMedsByMonth(List<Medication> meds) {
     Map<String, List<Medication>> groups = {};
+    // Sort by date so months appear in order
+    meds.sort((a, b) => b.endDate.compareTo(a.endDate));
+
     for (var med in meds) {
       String monthKey = DateFormat('MMMM yyyy').format(med.endDate);
       if (groups[monthKey] == null) groups[monthKey] = [];
@@ -110,17 +140,20 @@ class ScheduleScreen extends StatelessWidget {
   }
 
   Widget _buildTreatmentCard(Medication med) {
-    final DateTime today =
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final DateTime today = DateTime.now();
+    final DateTime todayDateOnly = DateTime(today.year, today.month, today.day);
     final DateTime endDateOnly =
         DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
 
-    bool isDatePassed = today.isAfter(endDateOnly);
-    // Note: If you want specific completion for specific times,
-    // you'll eventually need to store completed times in Firestore too.
-    bool isFullyCompleted =
-        med.completedDates.any((d) => DateUtils.isSameDay(d, endDateOnly));
-    final bool isActive = !isDatePassed && !isFullyCompleted;
+    bool isActive = !todayDateOnly.isAfter(endDateOnly);
+
+    // 1. Calculate Duration in days
+    // We add 1 to include both the start and end days in the count
+    final int durationDays = med.endDate.difference(med.startDate).inDays + 1;
+
+    // 2. Format the Date Range (e.g., "Oct 12 - Oct 26, 2023")
+    final String dateRange =
+        "${DateFormat('MMM d').format(med.startDate)} - ${DateFormat('MMM d, yyyy').format(med.endDate)}";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -136,43 +169,100 @@ class ScheduleScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        // Changed to Column to allow for a multi-row layout if needed
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.lightTeal.withOpacity(0.5),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.access_time_filled,
-                color: AppColors.primaryBlue),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.lightTeal.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child:
+                    const Icon(Icons.medication, color: AppColors.primaryBlue),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      med.name,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Dosage: ${med.dosage}",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              _buildStatusBadge(isActive),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  med.name,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Date Range and Time info
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today,
+                          size: 14, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Text(
+                        dateRange,
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time,
+                          size: 14, color: AppColors.primaryBlue),
+                      const SizedBox(width: 6),
+                      Text(
+                        med.time,
+                        style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              // Duration Badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Text(
-                  "Dosage: ${med.dosage}",
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Scheduled for: ${med.time}",
+                child: Text(
+                  "$durationDays Days",
                   style: const TextStyle(
                     color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          _buildStatusBadge(isActive),
         ],
       ),
     );
@@ -182,19 +272,19 @@ class ScheduleScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green[50] : Colors.red[50],
+        color: isActive ? Colors.green[50] : Colors.grey[100],
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isActive
               ? Colors.green.withOpacity(0.3)
-              : Colors.red.withOpacity(0.3),
+              : Colors.grey.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Text(
         isActive ? "Active" : "Finished",
         style: TextStyle(
-            color: isActive ? Colors.green : Colors.red,
+            color: isActive ? Colors.green : Colors.grey,
             fontSize: 12,
             fontWeight: FontWeight.bold),
       ),
