@@ -18,7 +18,7 @@ Of het nu gaat om een student met een onregelmatig schema of een oudere die meer
 
 ## Key Features (MVP)
 
-* **Scan & Go (OCR):** Geen gedoe met typen. Maak een foto van je voorschrift of medicatiedoosje en de app vult automatisch de details in via Google ML Kit.
+* **Scan & Go (OCR):** Geen gedoe met typen. Maak een foto van je medicatiedoosje en de app vult automatisch de details in.
 * **Educatieve AI-Chatbot:** Stel vragen zoals *"Mag ik dit innemen op een lege maag?"* en krijg direct een begrijpelijk antwoord (zonder medisch advies te vervangen).
 * **Dynamisch Dagoverzicht:** Een heldere tijdlijn die de cognitieve belasting verlaagt. Je ziet in één oogopslag wat je al hebt ingenomen en wat er nog komt.
 * **Toegankelijkheid Eerst:** Ontworpen met grote klikoppervlakken, hoog contrast en Text-to-Speech ondersteuning voor minder digivaardige gebruikers.
@@ -32,9 +32,9 @@ Of het nu gaat om een student met een onregelmatig schema of een oudere die meer
 | :--- | :--- |
 | **Frontend** | Flutter (Dart) |
 | **Backend/Auth** | Firebase (Firestore, Cloud Functions) |
-| **OCR Engine** | Google ML Kit (On-device) |
-| **AI Engine** | OpenAI / Gemini API (via Cloud Functions) |
-| **Design** | Visily / Figma |
+| **OCR Engine** | EMI API |
+| **AI Engine** | LM Studio |
+| **Design** | Visily |
 
 ---
 

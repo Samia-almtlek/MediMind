@@ -24,16 +24,16 @@ class DrugLoader {
     final String jsonString =
         await rootBundle.loadString('assets/drugs_clean.json');
 
+    // 🔥 Decode JSON (your file is List<String>)
     final List<dynamic> jsonList = json.decode(jsonString);
 
     // 🗂 Prepare data for batch insert
     final Map<String, String> drugMap = {};
 
     for (final item in jsonList) {
-      final String? name = item['name'];
-
-      if (name != null && name.isNotEmpty) {
-        final normalizedName = name.toLowerCase().trim();
+      // ✅ Because your JSON is List<String>
+      if (item is String && item.isNotEmpty) {
+        final normalizedName = item.toLowerCase().trim();
         drugMap[normalizedName] = normalizedName;
       }
     }

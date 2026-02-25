@@ -196,7 +196,7 @@ ScaffoldMessenger.of(this.context).showSnackBar(
                   color: AppColors.lightTeal,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.favorite_border,
                   size: 40,
                   color: AppColors.primaryBlue,
@@ -205,7 +205,7 @@ ScaffoldMessenger.of(this.context).showSnackBar(
 
               const SizedBox(height: 12),
 
-              Text(
+              const Text(
                 "MediMind",
                 style: TextStyle(
                   fontSize: 22,
@@ -284,7 +284,7 @@ if (result != null && result is Map) {
   }
 },
 
-                child: Text(
+                child: const Text(
                   "Create an account",
                   style: TextStyle(
                     color: AppColors.primaryBlue,

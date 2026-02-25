@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
+import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
 class ManualInputScreen extends StatefulWidget {
+  final Medication? medicationToEdit;
+
+  const ManualInputScreen({super.key, this.medicationToEdit});
+
   @override
   _ManualInputScreenState createState() => _ManualInputScreenState();
 }
@@ -15,6 +20,28 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController notesController = TextEditingController();
 
   List<String> suggestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill controllers if editing an existing medication
+    if (widget.medicationToEdit != null) {
+      nameController.text = widget.medicationToEdit!.name;
+      dosageController.text = widget.medicationToEdit!.dosage;
+      // Extract notes from instructions if it exists
+      if (widget.medicationToEdit!.instructions.contains("Notes:")) {
+        notesController.text = widget.medicationToEdit!.instructions.split("Notes:").last.trim();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    dosageController.dispose();
+    notesController.dispose();
+    super.dispose();
+  }
 
   /// 🔍 Autocomplete search from LOCAL Hive DB
   void searchDrugs(String query) {
@@ -42,9 +69,9 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "Manual Input",
-          style: TextStyle(color: Colors.black),
+        title: Text(
+          widget.medicationToEdit != null ? "Edit Medication" : "Manual Input",
+          style: const TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -140,6 +167,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                         notes: notesController.text.isNotEmpty
                             ? notesController.text
                             : null,
+                        medicationToEdit: widget.medicationToEdit,
                       ),
                     ),
                   );
@@ -165,7 +193,7 @@ class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
 
-  const SSurfaceButton({
+  const SSurfaceButton({super.key, 
     required this.text,
     required this.onPressed,
   });
