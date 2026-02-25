@@ -13,37 +13,29 @@ import 'presentation/screens/privacy_screen.dart';
 import 'presentation/screens/notification_settings_screen.dart';
 import 'package:medimind/core/notification/notification_service.dart';
 import 'data/local_db/drug_loader.dart';
+import 'upload_products.dart';
+
 /// Entry point for the app
 
 Future<void> main() async {
-  /// Ensures that Flutter bindings are initialized
-  /// before calling any asynchronous code.
   WidgetsFlutterBinding.ensureInitialized();
 
-
-
-  /// Initialize Hive (local key-value database)
-  /// Hive is a pure Dart solution and does not depend on
-  /// Android / iOS build tools.
   await Hive.initFlutter();
-
-  /// Open a Hive box to store medication names locally.
-  /// We only store Strings (drug names) for autocomplete.
   await Hive.openBox<String>('drugs');
   await DrugLoader.loadDrugsIfNeeded();
 
-  // Search the main() function and add the box
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Add the following: the box for medical ID (we use a dynamic box for different types)
   await Hive.openBox('medical_id_data');
-  // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
   await Hive.openBox('medication_stock');
-  await Hive.openBox('notification_settings'); // 🔒 NEW
+  await Hive.openBox('notification_settings');
 
   print('🗄️ Hive initialized successfully');
   await NotificationService.instance.init();
-  
+
+  // ⭐ EASIEST WAY: Trigger upload once (you can remove this after first run)
+  //uploadProducts();
+
   runApp(const MediMindApp());
 }
 
