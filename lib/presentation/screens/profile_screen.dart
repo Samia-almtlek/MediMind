@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'edit_profile_screen.dart';
@@ -14,6 +16,163 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true; // Placeholder for notification settings
+  final GlobalKey _keyAvatar = GlobalKey();
+  final GlobalKey _keyPersonalData = GlobalKey();
+  final GlobalKey _keyMyMedications = GlobalKey();
+  final GlobalKey _keyMedicalId = GlobalKey();
+  final GlobalKey _keyNotifications = GlobalKey();
+  final GlobalKey _keyPrivacy = GlobalKey();
+  final GlobalKey _keySupport = GlobalKey();
+  final GlobalKey _keyLogout = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  Future<void> _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('profile_tour_seen') ?? false;
+    if (seen || !mounted) return;
+    _showTutorial();
+    await prefs.setBool('profile_tour_seen', true);
+  }
+
+  void _showTutorial() {
+    final targets = <TargetFocus>[];
+
+    void addIfVisible({
+      required String identify,
+      required GlobalKey key,
+      required String title,
+      required String message,
+      required ContentAlign align,
+    }) {
+      if (key.currentContext != null) {
+        targets.add(_buildTarget(
+          identify: identify,
+          key: key,
+          title: title,
+          message: message,
+          align: align,
+        ));
+      }
+    }
+
+    addIfVisible(
+      identify: 'profile_avatar',
+      key: _keyAvatar,
+      title: 'Your profile',
+      message: 'Tap the camera icon to update your profile photo and personal details.',
+      align: ContentAlign.bottom,
+    );
+    addIfVisible(
+      identify: 'profile_personal_data',
+      key: _keyPersonalData,
+      title: 'Personal Data',
+      message: 'Open this item to edit your profile information.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_my_meds',
+      key: _keyMyMedications,
+      title: 'My Medications',
+      message: 'Track your active treatments and medication overview.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_medical_id',
+      key: _keyMedicalId,
+      title: 'Medical ID',
+      message: 'Store emergency information like blood type and contact details.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_notifications',
+      key: _keyNotifications,
+      title: 'Notifications',
+      message: 'Enable or disable reminder alerts from this section.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_privacy',
+      key: _keyPrivacy,
+      title: 'Privacy & Data',
+      message: 'Access GDPR settings and export/report privacy controls.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_support',
+      key: _keySupport,
+      title: 'Support',
+      message: 'Get help, FAQ answers, and contact options.',
+      align: ContentAlign.top,
+    );
+    addIfVisible(
+      identify: 'profile_logout',
+      key: _keyLogout,
+      title: 'Logout',
+      message: 'Sign out safely from your account.',
+      align: ContentAlign.top,
+    );
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      opacityShadow: 0.78,
+      textSkip: 'SKIP',
+      paddingFocus: 8,
+    ).show(context: context);
+  }
+
+  TargetFocus _buildTarget({
+    required String identify,
+    required GlobalKey key,
+    required String title,
+    required String message,
+    required ContentAlign align,
+  }) {
+    return TargetFocus(
+      identify: identify,
+      keyTarget: key,
+      contents: [
+        TargetContent(
+          align: align,
+          builder: (_, __) => Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.iconGrey.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   // Function to refresh user data after editing profile
   Future<void> _refreshUser() async {
@@ -53,6 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Stack(
                     children: [
                       CircleAvatar(
+                        key: _keyAvatar,
                         radius: 55,
                         backgroundColor: AppColors.lightTeal.withOpacity(0.5),
                         backgroundImage: user?.photoURL != null
@@ -114,6 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.person_outline,
               title: "Personal Data",
               subtitle: "Update your personal information",
+              leadingKey: _keyPersonalData,
               onTap: () async {
                 await Navigator.push(
                   context,
@@ -132,12 +293,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.health_and_safety_outlined,
               title: "My Medications",
               subtitle: "Track your active treatments",
+              leadingKey: _keyMyMedications,
               onTap: () => Navigator.pushNamed(context, '/medications'),
             ),
             _buildProfileItem(
               icon: Icons.medical_information_outlined,
               title: "Medical ID",
               subtitle: "Emergency contact & blood type",
+              leadingKey: _keyMedicalId,
               onTap: () => Navigator.pushNamed(context, '/medical_id'),
             ),
 
@@ -149,6 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.notifications_none_rounded,
               title: "Notifications",
               subtitle: "Reminders & Alerts",
+              leadingKey: _keyNotifications,
               onTap: () => Navigator.pushNamed(context,
                   '/notifications'), // Navigate to the notification settings screen
               trailing: Switch(
@@ -165,6 +329,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.lock_outline_rounded,
               title: "Privacy & Data",
               subtitle: "GDPR & Security settings",
+              leadingKey: _keyPrivacy,
               onTap: () => Navigator.pushNamed(context, '/privacy'),
             ),
 
@@ -176,6 +341,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.help_outline_rounded,
               title: "Support",
               subtitle: "FAQ & Contact us",
+              leadingKey: _keySupport,
               onTap: () => Navigator.pushNamed(context, '/support'),
             ),
 
@@ -185,8 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-              leading:
-                  const Icon(Icons.logout_rounded, color: Colors.redAccent),
+              leading: Icon(Icons.logout_rounded, key: _keyLogout, color: Colors.redAccent),
               title: const Text(
                 "Logout",
                 style: TextStyle(
@@ -226,11 +391,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       {required IconData icon,
       required String title,
       required String subtitle,
+      Key? leadingKey,
       Widget? trailing,
       VoidCallback? onTap}) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
       leading: Container(
+        key: leadingKey,
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.primaryBlue.withOpacity(0.08),
