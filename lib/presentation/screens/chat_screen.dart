@@ -1,8 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:medimind/service/chatbot/authorized_context_provider.dart';
+import 'package:medimind/service/chatbot/chat_memory_service.dart';
+import 'package:medimind/service/chatbot/chatbot_prompts.dart';
+import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
+import 'package:medimind/service/chatbot/lm_studio_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
-import 'dart:async';
 import '../../core/widgets/speaker_button.dart';
 
 
@@ -14,8 +21,14 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  static const int _minAuthorizedLengthToDisableExtra = 120;
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final AuthorizedContextProvider _contextProvider;
+  late final ChatMemoryService _chatMemoryService;
+  late final LmStudioChatClient _chatClient;
+  String? _sessionId;
   final GlobalKey _keyModeSwitch = GlobalKey();
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
@@ -32,9 +45,95 @@ class _ChatScreenState extends State<ChatScreen> {
     },
   ];
 
+  void _logMemoryError(String scope, Object error, [StackTrace? stackTrace]) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[ChatMemory][$scope] $error');
+    if (stackTrace != null) {
+      debugPrint(stackTrace.toString());
+    }
+  }
+
+  String? _extractDrugName(String authorizedContext) {
+    final lines = authorizedContext
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty);
+    for (final line in lines) {
+      if (line.toUpperCase().startsWith('DRUG:')) {
+        return line.substring(5).trim();
+      }
+    }
+    return null;
+  }
+
+  String _buildRetryQuestion({
+    required String originalQuestion,
+    required String authorizedContext,
+  }) {
+    final drug = _extractDrugName(authorizedContext);
+    final q = originalQuestion.trim();
+    final lower = q.toLowerCase();
+
+    if (drug != null &&
+        (lower.contains('tell me about') || lower.startsWith('what is '))) {
+      return 'Using only BEGIN_CONTEXT, give a concise overview of $drug, including use and key risks.';
+    }
+
+    if (drug != null &&
+        (lower.contains('risk') ||
+            lower.contains('side effect') ||
+            lower.contains('danger'))) {
+      return 'Using only BEGIN_CONTEXT, what are the risks and side effects of $drug?';
+    }
+
+    return 'Using only BEGIN_CONTEXT, answer this question: $q';
+  }
+
+  String _buildFollowUpHint(String conversationContext) {
+    final lines = conversationContext
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList()
+        .reversed;
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('user:')) {
+        return line;
+      }
+    }
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.contains('assistant:')) {
+        return line;
+      }
+    }
+
+    if (conversationContext.length <= 300) {
+      return conversationContext;
+    }
+
+    return conversationContext.substring(conversationContext.length - 300);
+  }
+
   @override
   void initState() {
     super.initState();
+    _chatClient = LmStudioChatClient();
+    _chatMemoryService = ChatMemoryService(
+      firestore: FirebaseFirestore.instance,
+      auth: FirebaseAuth.instance,
+    );
+    _contextProvider = FirestoreProductDescriptionContextProvider(
+      FirebaseFirestore.instance,
+      fallbackProvider: LocalDrugListContextProvider(),
+      maxProductsToScan: 2000,
+    );
+    _initializeSession();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowTour();
     });
@@ -128,13 +227,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -146,10 +238,61 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     });
   }
-  
-  void _handleSendMessage() {
+
+  Future<void> _initializeSession() async {
+    try {
+      final sessionId = await _chatMemoryService.ensureSessionId();
+      final persistedMessages =
+          await _chatMemoryService.getSessionMessages(sessionId);
+
+      final mappedMessages = persistedMessages
+          .map(
+            (message) => {
+              'text': message.content,
+              'isUser': message.isUser,
+              'time': message.time,
+            },
+          )
+          .toList();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _sessionId = sessionId;
+        if (mappedMessages.isNotEmpty) {
+          _messages
+            ..clear()
+            ..addAll(mappedMessages);
+        }
+      });
+
+      _scrollToBottom();
+    } catch (error, stackTrace) {
+      _logMemoryError('initializeSession', error, stackTrace);
+    }
+  }
+
+  Future<String> _getOrCreateSessionId() async {
+    final currentSessionId = _sessionId;
+    if (currentSessionId != null && currentSessionId.isNotEmpty) {
+      return currentSessionId;
+    }
+
+    final created = await _chatMemoryService.ensureSessionId();
+    if (mounted) {
+      setState(() {
+        _sessionId = created;
+      });
+    }
+    return created;
+  }
+
+  Future<void> _handleSendMessage() async {
     if (_controller.text.trim().isEmpty) return;
-    final userText= _controller.text;
+    if (_isTyping) return;
+    final userText = _controller.text.trim();
 
     setState(() {
       // Add user message
@@ -159,21 +302,179 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // Simulate AI response after a short delay
-    Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isTyping = false;
-          // Simulate AI response based on selected model
-          String response = _isDetailedMode
-              ? "Detailed Analysis: Research suggests that ${userText.toLowerCase().contains('aspirin') ? 'Aspirin' : 'this medication'} can have interactions with blood thinners. Always consult your doctor for a clinical diagnosis."
-              : "Quick Check: Generally safe, but take it after a meal to avoid stomach upset.";
+    String response;
 
-          _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
-        });
-        _scrollToBottom();
+    try {
+      final endpoint = LmStudioConfig.completionUri;
+      if (endpoint == null) {
+        throw LmStudioException(
+          'LM Studio URL is missing. Run with --dart-define=LM_STUDIO_BASE_URL=http://169.254.5.254:1234',
+        );
       }
+
+      String authorizedContext = '';
+      try {
+        authorizedContext =
+            await _contextProvider.buildAuthorizedContext(userText);
+        if (kDebugMode) {
+          debugPrint(
+            '[AuthorizedContext][length=${authorizedContext.length}] '
+            '${authorizedContext.length > 120 ? '${authorizedContext.substring(0, 120)}...' : authorizedContext}',
+          );
+        }
+      } catch (error, stackTrace) {
+        _logMemoryError('authorizedContext', error, stackTrace);
+      }
+
+      String conversationContext = '';
+      String? sessionId;
+      try {
+        sessionId = await _getOrCreateSessionId();
+      } catch (error, stackTrace) {
+        _logMemoryError('getOrCreateSession', error, stackTrace);
+      }
+
+      if (sessionId != null) {
+        try {
+        await _chatMemoryService.saveMessage(
+          sessionId: sessionId,
+          sender: 'user',
+          content: userText,
+        );
+        } catch (error, stackTrace) {
+          _logMemoryError('saveUserMessage', error, stackTrace);
+        }
+
+        try {
+          conversationContext =
+              await _chatMemoryService.buildConversationContext(sessionId);
+        } catch (error, stackTrace) {
+          _logMemoryError('buildConversationContext', error, stackTrace);
+        }
+      }
+
+      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+        if (sessionId != null) {
+          try {
+            final resolvedHits = await _chatMemoryService.getResolvedHits(sessionId);
+            for (final hit in resolvedHits) {
+              final hitAuthorizedContext =
+                  await _contextProvider.buildAuthorizedContext('$userText\n$hit');
+              if (hitAuthorizedContext.trim().isNotEmpty) {
+                authorizedContext = hitAuthorizedContext;
+                if (kDebugMode) {
+                  debugPrint('[AuthorizedContext] Resolved via stored hit: $hit');
+                }
+                break;
+              }
+            }
+          } catch (error, stackTrace) {
+            _logMemoryError('authorizedContextResolvedHits', error, stackTrace);
+          }
+        }
+
+      }
+
+      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+        try {
+          final followUpHint = _buildFollowUpHint(conversationContext);
+          final hintedAuthorizedContext = await _contextProvider
+              .buildAuthorizedContext('$userText\n$followUpHint');
+
+          if (hintedAuthorizedContext.trim().isNotEmpty) {
+            authorizedContext = hintedAuthorizedContext;
+            if (kDebugMode) {
+              debugPrint('[AuthorizedContext] Resolved via follow-up hint: $followUpHint');
+            }
+          }
+        } catch (error, stackTrace) {
+          _logMemoryError('authorizedContextFollowUpHint', error, stackTrace);
+        }
+      }
+
+      if (sessionId != null && authorizedContext.trim().isNotEmpty) {
+        final resolvedDrug = _extractDrugName(authorizedContext);
+        if (resolvedDrug != null && resolvedDrug.trim().isNotEmpty) {
+          try {
+            await _chatMemoryService.recordResolvedHit(sessionId, resolvedDrug);
+          } catch (error, stackTrace) {
+            _logMemoryError('recordResolvedHit', error, stackTrace);
+          }
+        }
+      }
+
+      final trimmedAuthorizedContext = authorizedContext.trim();
+      final shouldIncludeExtraContext =
+          trimmedAuthorizedContext.length < _minAuthorizedLengthToDisableExtra;
+      final extraContextForRequest =
+          shouldIncludeExtraContext ? conversationContext : '';
+
+      response = await _chatClient.complete(
+        endpoint: endpoint,
+        model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+        authorizedContext: authorizedContext,
+        extraContext: extraContextForRequest,
+        question: userText,
+      );
+
+      if (trimmedAuthorizedContext.isNotEmpty &&
+          response.trim() == kRefusalResponse) {
+        final retryQuestion = _buildRetryQuestion(
+          originalQuestion: userText,
+          authorizedContext: trimmedAuthorizedContext,
+        );
+
+        response = await _chatClient.complete(
+          endpoint: endpoint,
+          model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+          authorizedContext: authorizedContext,
+          extraContext: '',
+          question: retryQuestion,
+        );
+      }
+
+      if (sessionId != null) {
+        try {
+          await _chatMemoryService.saveMessage(
+            sessionId: sessionId,
+            sender: 'bot',
+            content: response,
+          );
+
+          await _chatMemoryService.updateSummary(
+            sessionId: sessionId,
+            userMessage: userText,
+            assistantMessage: response,
+          );
+        } catch (error, stackTrace) {
+          _logMemoryError('saveBotMessageOrSummary', error, stackTrace);
+        }
+      }
+    } on LmStudioException catch (error) {
+      response =
+          'I cannot complete this request right now: ${error.message}';
+    } catch (error) {
+      response =
+          'I cannot complete this request right now: ${error.runtimeType}. Please verify LM Studio is running and reachable.';
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isTyping = false;
+      _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
     });
+    _scrollToBottom();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _chatClient.dispose();
+    super.dispose();
   }
 
   @override
@@ -380,12 +681,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
-              onSubmitted: (_) => _handleSendMessage(),
+              onSubmitted: (_) {
+                _handleSendMessage();
+              },
             ),
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: _handleSendMessage,
+            onTap: () {
+              _handleSendMessage();
+            },
             child: const CircleAvatar(
               radius: 25,
               backgroundColor: AppColors.primaryBlue,

@@ -13,7 +13,7 @@ class UserRepositoryImpl implements UserRepository {
   Future<UserEntity?> getUserById(String userId) async {
     final doc = await _firestoreService.users
         .doc(userId)
-        .get();
+        .get() as DocumentSnapshot<Map<String, dynamic>>;
 
     if (!doc.exists) return null;
 

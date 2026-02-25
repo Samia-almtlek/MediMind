@@ -1,15 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
-import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
 class ManualInputScreen extends StatefulWidget {
-  final Medication? medicationToEdit;
-
-  const ManualInputScreen({super.key, this.medicationToEdit});
-
   @override
   _ManualInputScreenState createState() => _ManualInputScreenState();
 }
@@ -20,28 +15,6 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController notesController = TextEditingController();
 
   List<String> suggestions = [];
-
-  @override
-  void initState() {
-    super.initState();
-    // Pre-fill controllers if editing an existing medication
-    if (widget.medicationToEdit != null) {
-      nameController.text = widget.medicationToEdit!.name;
-      dosageController.text = widget.medicationToEdit!.dosage;
-      // Extract notes from instructions if it exists
-      if (widget.medicationToEdit!.instructions.contains("Notes:")) {
-        notesController.text = widget.medicationToEdit!.instructions.split("Notes:").last.trim();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    nameController.dispose();
-    dosageController.dispose();
-    notesController.dispose();
-    super.dispose();
-  }
 
   /// 🔍 Autocomplete search from LOCAL Hive DB
   void searchDrugs(String query) {
@@ -69,9 +42,9 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.medicationToEdit != null ? "Edit Medication" : "Manual Input",
-          style: const TextStyle(color: Colors.black),
+        title: const Text(
+          "Manual Input",
+          style: TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -92,8 +65,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
             ),
             TextField(
               controller: nameController,
-              decoration:
-                  const InputDecoration(hintText: "e.g., Paracetamol"),
+              decoration: const InputDecoration(hintText: "e.g., Paracetamol"),
               onChanged: searchDrugs,
             ),
 
@@ -123,8 +95,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
             ),
             TextField(
               controller: dosageController,
-              decoration:
-                  const InputDecoration(hintText: "e.g., 500 mg"),
+              decoration: const InputDecoration(hintText: "e.g., 500 mg"),
             ),
 
             const SizedBox(height: 20),
@@ -138,14 +109,12 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
               controller: notesController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText:
-                    "e.g., Take with food, avoid alcohol...",
+                hintText: "e.g., Take with food, avoid alcohol...",
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide:
-                      const BorderSide(color: AppColors.primaryBlue),
+                  borderSide: const BorderSide(color: AppColors.primaryBlue),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -167,15 +136,13 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                         notes: notesController.text.isNotEmpty
                             ? notesController.text
                             : null,
-                        medicationToEdit: widget.medicationToEdit,
                       ),
                     ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content:
-                          Text("Please enter a medication name"),
+                      content: Text("Please enter a medication name"),
                     ),
                   );
                 }
@@ -193,7 +160,7 @@ class SSurfaceButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
 
-  const SSurfaceButton({super.key, 
+  const SSurfaceButton({
     required this.text,
     required this.onPressed,
   });
