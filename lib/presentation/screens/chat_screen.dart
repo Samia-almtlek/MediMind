@@ -16,11 +16,9 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final GlobalKey _keyModeSwitch = GlobalKey();
+  final GlobalKey _keyAssistantBadge = GlobalKey();
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
-  // Toggle between 'Quick' and 'Detailed' models
-  bool _isDetailedMode = false;
   bool _isTyping = false; // To show typing indicator
 
   // Mock list of messages for the demo
@@ -51,10 +49,10 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showTutorial() {
     final targets = <TargetFocus>[
       _buildTarget(
-        identify: 'chat_mode',
-        key: _keyModeSwitch,
-        title: 'Quick / Detailed mode',
-        message: 'Switch between fast concise responses and more detailed medical explanations.',
+        identify: 'chat_assistant',
+        key: _keyAssistantBadge,
+        title: 'Assistant status',
+        message: 'Your MediMind assistant is ready to answer all your medication questions in one smart chat mode.',
         align: ContentAlign.bottom,
       ),
       _buildTarget(
@@ -183,10 +181,9 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _isTyping = false;
-          // Simulate AI response based on selected model
-          String response = _isDetailedMode
-              ? "Detailed Analysis: Research suggests that ${userText.toLowerCase().contains('aspirin') ? 'Aspirin' : 'this medication'} can have interactions with blood thinners. Always consult your doctor for a clinical diagnosis."
-              : "Quick Check: Generally safe, but take it after a meal to avoid stomach upset.";
+          String response = userText.toLowerCase().contains('aspirin')
+              ? "Aspirin may interact with blood thinners and some anti-inflammatory drugs. If you are combining treatments, check with your doctor or pharmacist first."
+              : "Thanks for your question. I can help with dosage timing, interactions, and safe usage tips. If symptoms are urgent, contact a healthcare professional directly.";
 
           _messages.add({"text": response, "isUser": false, "time": DateTime.now()});
         });
@@ -198,101 +195,86 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("MediMind Assistant", style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),),
-            Text("Always online", style: TextStyle(color: Colors.green, fontSize: 12)),
+            Text("Always online", style: TextStyle(color: AppColors.primaryBlue, fontSize: 12)),
           ],
         ),
         backgroundColor: Colors.white,
         elevation: 0.5,
         actions: [
-          // Switch for the two models
-          _buildToggleSwitch(),
+          _buildAssistantBadge(),
+          const SizedBox(width: 12),
         ],
       ),
-      body: Column(
-        children: [
-          _buildModeBanner(),
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              itemCount: _messages.length + (_isTyping ? 1 : 0), // Add extra item for typing indicator
-              itemBuilder: (context, index) {
-                if (index == _messages.length) {
-                  return _buildTypingIndicator();
-                } else {
-                  return _buildChatBubble(
-                    _messages[index],
-                    bubbleKey: index == 0 ? _keyMessages : null,
-                  );
-                }
-              },
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.lightTeal.withOpacity(0.24),
+              AppColors.backgroundWhite,
+            ],
           ),
-          _buildInputArea(),
-        ],
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                itemCount: _messages.length + (_isTyping ? 1 : 0), // Add extra item for typing indicator
+                itemBuilder: (context, index) {
+                  if (index == _messages.length) {
+                    return _buildTypingIndicator();
+                  } else {
+                    return _buildChatBubble(
+                      _messages[index],
+                      bubbleKey: index == 0 ? _keyMessages : null,
+                    );
+                  }
+                },
+              ),
+            ),
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildModeBanner() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      color: _isDetailedMode ? AppColors.primaryBlue.withOpacity(0.1) : Colors.amber.withOpacity(0.1),
+  Widget _buildAssistantBadge() {
+    return Container(
+      key: _keyAssistantBadge,
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.lightTeal.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.35)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _isDetailedMode ? Icons.biotech : Icons.bolt,
-            size: 14,
-            color: _isDetailedMode ? AppColors.primaryBlue : Colors.orange,
+          const Icon(
+            Icons.verified_user_outlined,
+            size: 16,
+            color: AppColors.primaryBlue,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
-            _isDetailedMode ? "Detailed Mode: Extensive Medical Insights" : "Quick Mode: Fast & Direct Answers",
+            "Smart Assistant",
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _isDetailedMode ? AppColors.primaryBlue : Colors.orange[800],
+              color: AppColors.iconGrey,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToggleSwitch() {
-    return Container(
-      key: _keyModeSwitch,
-      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        children: [
-          Text("Quick", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.normal : FontWeight.bold)),
-          const SizedBox(width: 4),
-          Icon(Icons.bolt, size:14, color: _isDetailedMode ? Colors.grey : Colors.amber),
-          Transform.scale(
-            scale: 0.8,
-            child: Switch(
-              value: _isDetailedMode,
-              activeThumbColor: AppColors.primaryBlue,
-              onChanged: (value) => setState(() => _isDetailedMode = value),
-            ),
-          ),
-          Icon(Icons.biotech, size: 14, color: _isDetailedMode ? AppColors.primaryBlue : Colors.grey),
-          const SizedBox(width: 4),
-          Text("Detailed", style: TextStyle(fontSize: 10, fontWeight: _isDetailedMode ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
@@ -305,9 +287,15 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: AppColors.lightTeal.withOpacity(0.35),
+          border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryBlue.withOpacity(0.08),
+              blurRadius: 6,
+            )
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -332,11 +320,15 @@ class _ChatScreenState extends State<ChatScreen> {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         key: bubbleKey,
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primaryBlue : Colors.white,          borderRadius: BorderRadius.only(
+          color: isUser ? AppColors.primaryBlue : AppColors.lightTeal.withOpacity(0.45),
+          border: isUser
+              ? null
+              : Border.all(color: AppColors.lightTeal),
+          borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
             bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(0),
@@ -344,57 +336,80 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: AppColors.primaryBlue.withOpacity(0.08),
               blurRadius: 5,
               offset: const Offset(0, 2)
             ),
           ],
         ),
-       child: Row(
-  mainAxisSize: MainAxisSize.min,
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Expanded(
-      child: Text(
-        msg["text"],
-        style: TextStyle(
-          color: isUser ? Colors.white : Colors.black87,
-          fontSize: 16,
-          height: 1.4,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: Text(
+                msg["text"],
+                style: TextStyle(
+                  color: isUser ? Colors.white : AppColors.iconGrey,
+                  fontSize: 16,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            if (!isUser) ...[
+              const SizedBox(width: 8),
+              SpeakerButton(
+                text: msg["text"],
+                size: 18,
+                color: AppColors.primaryBlue,
+              ),
+            ],
+          ],
         ),
       ),
-    ),
-    if (!isUser)
-      SpeakerButton(
-        text: msg["text"],
-        size: 18,
-        color: Colors.grey[600],
-      ),
-  ],
-),
-    ));
+    );
   }
 
   Widget _buildInputArea() {
     return Container(
       key: _keyInput,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
+      decoration: BoxDecoration(
+        color: AppColors.backgroundWhite,
+        border: Border(
+          top: BorderSide(color: AppColors.primaryBlue.withOpacity(0.22)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryBlue.withOpacity(0.07),
+            blurRadius: 10,
+          )
+        ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
+              minLines: 1,
+              maxLines: 5,
+              keyboardType: TextInputType.multiline,
               decoration: InputDecoration(
                 hintText: "Ask about your meds...",
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: AppColors.lightTeal.withOpacity(0.18),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: AppColors.lightTeal.withOpacity(0.8)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide(color: AppColors.lightTeal.withOpacity(0.8)),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(30)),
+                  borderSide: BorderSide(color: AppColors.primaryBlue),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
