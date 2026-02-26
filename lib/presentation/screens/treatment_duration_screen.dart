@@ -114,6 +114,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
         title: Text(
           widget.medicationToEdit != null ? "Edit Schedule" : "Schedule Logic",

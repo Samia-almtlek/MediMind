@@ -68,6 +68,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
         title: Text(
           widget.medicationToEdit != null ? "Edit Medication" : "Manual Input",
