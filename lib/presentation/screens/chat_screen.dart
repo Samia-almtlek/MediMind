@@ -77,7 +77,26 @@ class _ChatScreenState extends State<ChatScreen> {
       targets: targets,
       colorShadow: AppColors.primaryBlue,
       opacityShadow: 0.78,
-      textSkip: 'SKIP',
+      alignSkip: Alignment.bottomRight,
+      skipWidget: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(right: 14, bottom: 80),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundWhite.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
+          ),
+          child: const Text(
+            'SKIP',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ),
       paddingFocus: 8,
     ).show(context: context);
   }
@@ -317,8 +336,7 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primaryBlue : Colors.white,
-          borderRadius: BorderRadius.only(
+          color: isUser ? AppColors.primaryBlue : Colors.white,          borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
             bottomLeft: isUser ? const Radius.circular(20) : const Radius.circular(0),

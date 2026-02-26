@@ -95,7 +95,26 @@ void _showMainTour() {
     targets: targets,
     colorShadow: AppColors.primaryBlue,
     opacityShadow: 0.78,
-    textSkip: 'SKIP',
+    alignSkip: Alignment.topLeft,
+    skipWidget: SafeArea(
+      child: Container(
+        margin: const EdgeInsets.only(left: 14, top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundWhite.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
+        ),
+        child: const Text(
+          'SKIP',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    ),
     paddingFocus: 8,
   ).show(context: context);
 }
