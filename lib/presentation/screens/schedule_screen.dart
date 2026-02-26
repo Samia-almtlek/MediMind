@@ -21,7 +21,82 @@ class ScheduleScreen extends StatelessWidget {
           "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}. ";
     }
 
+<<<<<<< HEAD
     return summary;
+=======
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      opacityShadow: 0.78,
+      alignSkip: Alignment.topLeft,
+      skipWidget: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 14, top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundWhite.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
+          ),
+          child: const Text(
+            'SKIP',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ),
+      paddingFocus: 8,
+    ).show(context: context);
+  }
+
+  TargetFocus _buildTarget({
+    required String identify,
+    required GlobalKey key,
+    required String title,
+    required String message,
+    required ContentAlign align,
+  }) {
+    return TargetFocus(
+      identify: identify,
+      keyTarget: key,
+      contents: [
+        TargetContent(
+          align: align,
+          builder: (_, __) => Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.iconGrey.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+>>>>>>> feature/interactive_tour
   }
 
   @override

@@ -82,6 +82,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
         title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
