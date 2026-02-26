@@ -16,6 +16,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true; // Placeholder for notification settings
+  final ScrollController _scrollController = ScrollController();
   final GlobalKey _keyAvatar = GlobalKey();
   final GlobalKey _keyPersonalData = GlobalKey();
   final GlobalKey _keyMyMedications = GlobalKey();
@@ -42,9 +43,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showTutorial() {
-    final targets = <TargetFocus>[];
+    final topTargets = <TargetFocus>[];
+    final bottomTargets = <TargetFocus>[];
 
     void addIfVisible({
+      required List<TargetFocus> list,
       required String identify,
       required GlobalKey key,
       required String title,
@@ -52,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       required ContentAlign align,
     }) {
       if (key.currentContext != null) {
-        targets.add(_buildTarget(
+        list.add(_buildTarget(
           identify: identify,
           key: key,
           title: title,
@@ -63,6 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     addIfVisible(
+      list: topTargets,
       identify: 'profile_avatar',
       key: _keyAvatar,
       title: 'Your profile',
@@ -70,6 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.bottom,
     );
     addIfVisible(
+      list: topTargets,
       identify: 'profile_personal_data',
       key: _keyPersonalData,
       title: 'Personal Data',
@@ -77,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: topTargets,
       identify: 'profile_my_meds',
       key: _keyMyMedications,
       title: 'My Medications',
@@ -84,6 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: topTargets,
       identify: 'profile_medical_id',
       key: _keyMedicalId,
       title: 'Medical ID',
@@ -91,6 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: topTargets,
       identify: 'profile_notifications',
       key: _keyNotifications,
       title: 'Notifications',
@@ -98,6 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: bottomTargets,
       identify: 'profile_privacy',
       key: _keyPrivacy,
       title: 'Privacy & Data',
@@ -105,6 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: bottomTargets,
       identify: 'profile_support',
       key: _keySupport,
       title: 'Support',
@@ -112,6 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
     addIfVisible(
+      list: bottomTargets,
       identify: 'profile_logout',
       key: _keyLogout,
       title: 'Logout',
@@ -119,8 +130,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       align: ContentAlign.top,
     );
 
+    if (topTargets.isEmpty) return;
+
+    Future<void> showBottomTour() async {
+      if (bottomTargets.isEmpty || !mounted) return;
+      await _scrollToKey(_keyPrivacy);
+      if (!mounted) return;
+      TutorialCoachMark(
+        targets: bottomTargets,
+        colorShadow: AppColors.primaryBlue,
+        opacityShadow: 0.78,
+        alignSkip: Alignment.topLeft,
+        skipWidget: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.only(left: 14, top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppColors.backgroundWhite.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
+            ),
+            child: const Text(
+              'SKIP',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ),
+        paddingFocus: 8,
+      ).show(context: context);
+    }
+
     TutorialCoachMark(
-      targets: targets,
+      targets: topTargets,
       colorShadow: AppColors.primaryBlue,
       opacityShadow: 0.78,
       alignSkip: Alignment.topLeft,
@@ -144,7 +189,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       paddingFocus: 8,
+      onFinish: showBottomTour,
     ).show(context: context);
+  }
+
+  Future<void> _scrollToKey(GlobalKey key) async {
+    final contextForKey = key.currentContext;
+    if (contextForKey == null || !_scrollController.hasClients) return;
+
+    await Scrollable.ensureVisible(
+      contextForKey,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeInOut,
+      alignment: 0.18,
+    );
   }
 
   TargetFocus _buildTarget({
@@ -205,6 +263,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Take the logged in user from firebase auth
     final User? user = FirebaseAuth.instance.currentUser;
@@ -221,6 +285,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           children: [
             const SizedBox(height: 30),
