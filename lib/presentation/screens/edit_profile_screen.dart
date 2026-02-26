@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../utils/app_colors.dart';
 
@@ -16,6 +17,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _ageController = TextEditingController();
   final _passwordController = TextEditingController();
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
@@ -26,6 +28,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _nameController.text = user?.displayName ?? "";
     _emailController.text = user?.email ?? "";
+    _loadOptionalAge();
+  }
+
+  Future<void> _loadOptionalAge() async {
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+
+      final data = doc.data();
+      final age = data?['age'];
+      if (!mounted || age == null) return;
+
+      _ageController.text = age.toString();
+    } catch (_) {
+    }
   }
 
   Future<void> _updateProfile() async {
@@ -40,6 +60,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 2. Update Display Name
       if (_nameController.text != user?.displayName) {
         await user?.updateDisplayName(_nameController.text);
+      }
+
+      if (user != null) {
+        final trimmedAge = _ageController.text.trim();
+        final parsedAge = int.tryParse(trimmedAge);
+
+        if (trimmedAge.isNotEmpty && (parsedAge == null || parsedAge < 0 || parsedAge > 130)) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please enter a valid age (0-130).")),
+          );
+          return;
+        }
+
+        await FirebaseFirestore.instance.collection('users').doc(user!.uid).set({
+          'age': trimmedAge.isEmpty ? FieldValue.delete() : parsedAge,
+        }, SetOptions(merge: true));
       }
 
       // 3. Forces a reload of the user to ensure the latest data is fetched from Firebase
@@ -57,6 +94,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _ageController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
@@ -111,6 +157,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 const SizedBox(height: 20),
                 _buildTextField(_nameController, "Username", Icons.person_outline),
                 _buildTextField(_emailController, "Email", Icons.email_outlined, inputType: TextInputType.emailAddress),
+                _buildTextField(_ageController, "Age (optional)", Icons.cake_outlined, inputType: TextInputType.number),
                 _buildTextField(_passwordController, "New Password (optional)", Icons.lock_outline, isPassword: true),
                 const SizedBox(height: 30),
                 ElevatedButton(
