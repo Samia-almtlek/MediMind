@@ -79,7 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     addIfVisible(
       identify: 'profile_my_meds',
       key: _keyMyMedications,
-      title: 'My Medications',
+      title: 'My Cabinet',
       message: 'Track your active treatments and medication overview.',
       align: ContentAlign.top,
     );

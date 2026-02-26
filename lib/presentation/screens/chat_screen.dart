@@ -354,6 +354,28 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+        if (sessionId != null) {
+          try {
+            final resolvedHits = await _chatMemoryService.getResolvedHits(sessionId);
+            for (final hit in resolvedHits) {
+              final hitAuthorizedContext =
+                  await _contextProvider.buildAuthorizedContext('$userText\n$hit');
+              if (hitAuthorizedContext.trim().isNotEmpty) {
+                authorizedContext = hitAuthorizedContext;
+                if (kDebugMode) {
+                  debugPrint('[AuthorizedContext] Resolved via stored hit: $hit');
+                }
+                break;
+              }
+            }
+          } catch (error, stackTrace) {
+            _logMemoryError('authorizedContextResolvedHits', error, stackTrace);
+          }
+        }
+
+      }
+
+      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
         try {
           final followUpHint = _buildFollowUpHint(conversationContext);
           final hintedAuthorizedContext = await _contextProvider
@@ -367,6 +389,17 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         } catch (error, stackTrace) {
           _logMemoryError('authorizedContextFollowUpHint', error, stackTrace);
+        }
+      }
+
+      if (sessionId != null && authorizedContext.trim().isNotEmpty) {
+        final resolvedDrug = _extractDrugName(authorizedContext);
+        if (resolvedDrug != null && resolvedDrug.trim().isNotEmpty) {
+          try {
+            await _chatMemoryService.recordResolvedHit(sessionId, resolvedDrug);
+          } catch (error, stackTrace) {
+            _logMemoryError('recordResolvedHit', error, stackTrace);
+          }
         }
       }
 
