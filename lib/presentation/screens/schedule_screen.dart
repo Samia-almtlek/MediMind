@@ -108,7 +108,7 @@ class ScheduleScreen extends StatelessWidget {
     );
   }
 
-  /// 🔥 CARD WITH STOCK + REFILL
+  /// 🔥 CARD WITH STOCK + REFILL + DURATION
   Widget _buildTreatmentCard(UserMedicationModel med, BuildContext context) {
     final DateTime today =
         DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
@@ -123,6 +123,12 @@ class ScheduleScreen extends StatelessWidget {
     final bool isActive = !isDatePassed && med.isActive;
 
     final bool isLowStock = med.currentStock <= med.lowStockThresholdDays;
+
+    // Formatting the dates for display
+    final String startDateStr = DateFormat('MMM d, yyyy').format(med.startDate);
+    final String endDateStr = med.endDate != null
+        ? DateFormat('MMM d, yyyy').format(med.endDate!)
+        : "Ongoing";
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -139,6 +145,8 @@ class ScheduleScreen extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start, // Adjusted for better alignment
         children: [
           Container(
             padding: EdgeInsets.all(12),
@@ -168,6 +176,21 @@ class ScheduleScreen extends StatelessWidget {
                     color: AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+
+                SizedBox(height: 8),
+
+                /// 🔥 DURATION DISPLAY
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today,
+                        size: 14, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Text(
+                      "$startDateStr - $endDateStr",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ],
                 ),
 
                 SizedBox(height: 8),
