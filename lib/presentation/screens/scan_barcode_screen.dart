@@ -4,6 +4,7 @@ import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/widgets/speaker_button.dart';
+
 class ScanBarcodeScreen extends StatefulWidget {
   const ScanBarcodeScreen({super.key});
 
@@ -12,7 +13,6 @@ class ScanBarcodeScreen extends StatefulWidget {
 }
 
 class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
-  final MobileScannerController nameController = MobileScannerController();
   final MobileScannerController controller = MobileScannerController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -20,15 +20,13 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
   bool isTorchOn = false;
 
   // Placeholder ID until you add Firebase Auth
-  final String currentUserId = "5E4oT7RrhVZyN1RYMDZEQVMzuI13"; //need change
+  final String currentUserId = "5E4oT7RrhVZyN1RYMDZEQVMzuI13"; 
 
   @override
   void dispose() {
     controller.dispose();
     super.dispose();
   }
-
-  // --- FIREBASE LOGIC ---
 
   Future<void> _fetchAndShowData(String barcode) async {
     showDialog(
@@ -40,19 +38,16 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
     _logScan(barcode);
 
     try {
-      // Use .where() to search for the barcode field inside any document
       QuerySnapshot querySnapshot = await _firestore
           .collection('product')
           .where('barcode', isEqualTo: barcode)
-          .limit(1) // Optimization: stop searching after the first match
+          .limit(1)
           .get();
 
       if (!mounted) return;
       Navigator.pop(context);
 
-      // Check if the query returned any documents
       if (querySnapshot.docs.isNotEmpty) {
-        // Get the data from the first document found
         var doc = querySnapshot.docs.first;
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
@@ -99,10 +94,7 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
     }
   }
 
-  // --- UI COMPONENTS ---
-
-  void _showResultSheet(String code, String title, String subtitle,
-      {required bool isFound}) {
+  void _showResultSheet(String code, String title, String subtitle, {required bool isFound}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -120,62 +112,50 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
             children: [
               Text(
                 isFound ? "PRODUCT FOUND" : "NOT FOUND PRODUCT",
-                
                 style: TextStyle(
                   color: isFound ? Colors.green[800] : Colors.red[800],
                   fontWeight: FontWeight.bold,
                 ),
               ),
               SpeakerButton(
-  text: isFound
-      ? "Product found. $title. Dosage: $subtitle."
-      : "Product not found. This barcode is not in the database.",
-  size: 24,
-  color: AppColors.primaryBlue,
-),
-
+                text: isFound
+                    ? "Product found. $title. Dosage: $subtitle."
+                    : "Product not found. This barcode is not in the database.",
+                size: 24,
+                color: AppColors.primaryBlue,
+              ),
               const SizedBox(height: 10),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.bold)),
-              Text("Barcode: $code",
-                  style: const TextStyle(color: Colors.grey)),
+              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text("Barcode: $code", style: const TextStyle(color: Colors.grey)),
               const Divider(height: 40),
               Text(subtitle, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 30),
-              // Add the "ADD MEDICINE" button if the product was found
               if (isFound) ...[
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor:
-                        AppColors.primaryBlue, // Use your app's primary color
+                    backgroundColor: AppColors.primaryBlue,
                   ),
                   onPressed: () {
-                    Navigator.pop(context); // Close the bottom sheet
-                    // Navigate to your treatment duration screen
+                    Navigator.pop(context); 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => TreatmentDurationScreen(
-                          medicationName:
-                              title, // Pass data if your screen accepts it
-                          dosage: subtitle, // Example: pass the dosage info
+                          medicationName: title,
+                          dosage: subtitle,
+                          isFromScanner: true, // <--- PASSING THE FLAG HERE
                         ),
                       ),
                     ).then((_) {
-                      // Optional: Resume scanning when returning back to this screen
                       setState(() => isScanning = true);
                     });
                   },
                   child: const Text("ADD MEDICINE",
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(height: 12), // Space between buttons
+                const SizedBox(height: 12),
               ],
-
-// Existing "NEXT SCAN" button
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 15),
@@ -186,8 +166,7 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
                   setState(() => isScanning = true);
                 },
                 child: Text(isFound ? "SCAN ANOTHER" : "TRY AGAIN",
-                    style:
-                        TextStyle(color: isFound ? Colors.blue : Colors.grey)),
+                    style: TextStyle(color: isFound ? Colors.blue : Colors.grey)),
               ),
             ],
           ),
