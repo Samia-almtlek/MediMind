@@ -185,8 +185,9 @@ ScaffoldMessenger.of(this.context).showSnackBar(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
+         child: SingleChildScrollView(
+  child: Column(
+    children: [
               const SizedBox(height: 60),
 
               // Logo
@@ -272,10 +273,57 @@ Align(
                 ),
               ),
 
-              const SizedBox(height: 20),
+const SizedBox(height: 20),
 
-              // Create Account
-              TextButton(
+// =====================
+// GOOGLE SIGN IN BUTTON
+// =====================
+GestureDetector(
+  onTap: _isLoading
+      ? null
+      : () async {
+          setState(() => _isLoading = true);
+
+          try {
+            await _authService.signInWithGoogle();
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString())),
+            );
+          }
+
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+        },
+  child: Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: Colors.grey),
+    ),
+    child: const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
+        SizedBox(width: 8),
+        Text(
+          "Continue with Google",
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    ),
+  ),
+),
+
+const SizedBox(height: 20),
+
+// Create Account
+TextButton(
                 onPressed: () async {
   final result = await Navigator.pushNamed(context, '/signup');
 if (result != null && result is Map) {
@@ -292,11 +340,13 @@ if (result != null && result is Map) {
                   ),
                 ),
               ),
-            ],
+              ],
           ),
-        ),
-      ),
-    );
+        ), // closes SingleChildScrollView
+      ),   // closes Padding
+    ),     // closes SafeArea
+  );       // closes Scaffold
+    
   }
 
   Widget _buildInputField({
