@@ -13,26 +13,26 @@ class TreatmentDurationScreen extends StatefulWidget {
   final String medicationName;
   final String dosage;
   final String? notes;
+  final bool isFromScanner; // 1. Added field
 
   TreatmentDurationScreen({
     required this.medicationName,
     required this.dosage,
     this.notes,
+    this.isFromScanner = false, // 2. Default value for manual entries
   });
 
   @override
-  _TreatmentDurationScreenState createState() =>
-      _TreatmentDurationScreenState();
+  _TreatmentDurationScreenState createState() => _TreatmentDurationScreenState();
 }
 
 class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   String selectedDuration = "7 days";
-
   int customDays = 0;
   int frequency = 1;
-  int? currentStock; // 🆕 STOCK
+  int? currentStock; 
 
-  List<TimeOfDay> selectedTimes = [TimeOfDay(hour: 8, minute: 0)];
+  List<TimeOfDay> selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
 
   void _updateTimeSuggestions(int newFrequency) {
     setState(() {
@@ -75,7 +75,6 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     if (widget.notes != null && widget.notes!.isNotEmpty) {
       summary += "Notes: ${widget.notes}.";
     }
-
     return summary;
   }
 
@@ -83,11 +82,11 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
+        title: const Text("Schedule Logic", style: TextStyle(color: Colors.black)),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -96,35 +95,29 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Duration",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Duration", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             _buildDurationGrid(),
             if (selectedDuration == "Custom") _buildCustomDaysInput(),
 
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
 
-            Text("Daily Frequency",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Daily Frequency", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             _buildFrequencyDropdown(),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            Text("Intake Times",
-                style: TextStyle(fontSize: 16, color: Colors.grey)),
+            const Text("Intake Times", style: TextStyle(fontSize: 16, color: Colors.grey)),
             _buildTimePickerList(),
 
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
 
-            // 🆕 STOCK INPUT
-            Text("Current Stock",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
+            const Text("Current Stock", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             TextField(
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 hintText: "How many tablets do you currently have?",
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onChanged: (val) {
                 setState(() {
@@ -133,19 +126,15 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
               },
             ),
 
-            SizedBox(height: 30),
-
+            const SizedBox(height: 30),
             _buildCenteredSummary(),
-
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryBlue,
-                minimumSize: Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () async {
                 int totalDays = selectedDuration == "Custom"
@@ -153,41 +142,25 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                     : int.parse(selectedDuration.split(' ')[0]);
 
                 DateTime startDate = DateTime.now();
-                DateTime calculatedEndDate =
-                    startDate.add(Duration(days: totalDays - 1));
+                DateTime calculatedEndDate = startDate.add(Duration(days: totalDays - 1));
 
-                final repository =
-                    UserMedicationRepositoryImpl(FirestoreService());
+                final repository = UserMedicationRepositoryImpl(FirestoreService());
 
                 try {
                   final User? user = FirebaseAuth.instance.currentUser;
                   if (user == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              "You must be logged in to save medication.")),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("You must be logged in.")));
                     return;
                   }
 
                   if (currentStock == null || currentStock! <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            "Please enter the number of tablets you have."),
-                      ),
-                    );
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter stock count.")));
                     return;
                   }
 
-                  final String uid = user.uid;
-
                   final newMedication = UserMedicationEntity(
-                    id: FirebaseFirestore.instance
-                        .collection('user_medications')
-                        .doc()
-                        .id,
-                    userId: uid,
+                    id: FirebaseFirestore.instance.collection('user_medications').doc().id,
+                    userId: user.uid,
                     productId: "",
                     name: widget.medicationName,
                     dosage: widget.dosage,
@@ -196,13 +169,10 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                     endDate: calculatedEndDate,
                     instructions: widget.notes,
                     intakeTimes: selectedTimes
-                        .map((t) =>
-                            "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}")
+                        .map((t) => "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}")
                         .toList(),
                     isActive: true,
-                    aangemaaktViaOCR: false,
-
-                    // 🆕 STOCK VALUES
+                    aangemaaktViaOCR: widget.isFromScanner, // 3. Set from flag
                     initialStock: currentStock!,
                     currentStock: currentStock!,
                     lowStockThresholdDays: 3,
@@ -210,31 +180,28 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   );
 
                   await repository.addUserMedication(newMedication);
-
                   final generator = DoseGenerationService();
                   await generator.generateDoses(newMedication);
 
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          SuccessScreen(medicationName: widget.medicationName),
+                      builder: (context) => SuccessScreen(medicationName: widget.medicationName),
                     ),
                   );
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error saving medication: $e")),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
                 }
               },
-              child: Text("Confirm & Save",
-                  style: TextStyle(color: Colors.white, fontSize: 18)),
+              child: const Text("Confirm & Save", style: TextStyle(color: Colors.white, fontSize: 18)),
             ),
           ],
         ),
       ),
     );
   }
+
+  // --- UI Helpers ---
 
   Widget _buildDurationGrid() {
     List<String> options = ["7 days", "14 days", "30 days", "Custom"];
@@ -298,14 +265,12 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   }
 
   Widget _buildCenteredSummary() {
-    int totalDays = selectedDuration == "Custom"
-        ? customDays
-        : int.parse(selectedDuration.split(' ')[0]);
+    int totalDays = selectedDuration == "Custom" ? customDays : int.parse(selectedDuration.split(' ')[0]);
 
     return Center(
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.lightTeal.withOpacity(0.3),
           borderRadius: BorderRadius.circular(15),
@@ -313,23 +278,15 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         ),
         child: Column(
           children: [
-            Text(
-              "Schedule Overview",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            const Text("Schedule Overview", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 8),
-            SpeakerButton(
-              text: _buildTreatmentSummary(),
-              size: 22,
-              color: AppColors.primaryBlue,
-            ),
-            Divider(),
+            SpeakerButton(text: _buildTreatmentSummary(), size: 22, color: AppColors.primaryBlue),
+            const Divider(),
             Text("Medication: ${widget.medicationName} (${widget.dosage})"),
             Text("Frequency: $frequency times daily"),
             Text("Duration: $totalDays days"),
             Text("Total Doses: ${totalDays * frequency}",
-                style: TextStyle(
-                    color: AppColors.primaryBlue, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
