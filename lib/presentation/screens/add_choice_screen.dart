@@ -23,7 +23,20 @@ class AddChoiceScreen extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: 24),
+            Text(
+              "Choose how to add your medication",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.iconGrey,
+              ),
+            ),
+            const SizedBox(height: 30),
             // manual input option
             _buildOptionCard(
               context,
@@ -62,19 +75,52 @@ class AddChoiceScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.lightTeal.withOpacity(0.2),
+          border: Border.all(color: AppColors.lightTeal.withOpacity(0.8)),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryBlue.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, size: 48, color: AppColors.primaryBlue),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.backgroundWhite,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.lightTeal),
+              ),
+              child: Icon(icon, size: 34, color: AppColors.primaryBlue),
+            ),
             const SizedBox(height: 12),
             Text(title,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey)),
+                style: TextStyle(color: AppColors.iconGrey.withOpacity(0.85))),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Text(
+                  "Tap to continue",
+                  style: TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward_rounded,
+                    size: 18, color: AppColors.primaryBlue),
+              ],
+            ),
           ],
         ),
       ),
