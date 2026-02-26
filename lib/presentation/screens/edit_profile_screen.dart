@@ -1,10 +1,11 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../utils/app_colors.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,16 +18,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-<<<<<<< HEAD
-
-  // New Controllers for Password logic
+  final _ageController = TextEditingController();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
 
-=======
-  final _ageController = TextEditingController();
-  final _passwordController = TextEditingController();
->>>>>>> feature/interactive_tour
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
@@ -34,8 +29,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController.text = user?.displayName ?? "";
-    _emailController.text = user?.email ?? "";
+    _nameController.text = user?.displayName ?? '';
+    _emailController.text = user?.email ?? '';
     _loadOptionalAge();
   }
 
@@ -46,121 +41,90 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           .collection('users')
           .doc(user!.uid)
           .get();
-
       final data = doc.data();
       final age = data?['age'];
       if (!mounted || age == null) return;
-
       _ageController.text = age.toString();
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _updateProfile() async {
     final String newPassword = _newPasswordController.text.trim();
     final String currentPassword = _currentPasswordController.text.trim();
 
-    // Validation: If they typed a new password, they MUST provide the current one
     if (newPassword.isNotEmpty && currentPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text("Please enter your current password to set a new one.")),
+          content: Text('Please enter your current password to set a new one.'),
+        ),
+      );
+      return;
+    }
+
+    final trimmedAge = _ageController.text.trim();
+    final parsedAge = int.tryParse(trimmedAge);
+    if (trimmedAge.isNotEmpty && (parsedAge == null || parsedAge < 0 || parsedAge > 130)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid age (0-130).')),
       );
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      // 1. Re-authenticate if password change is requested
-      if (newPassword.isNotEmpty) {
-        AuthCredential credential = EmailAuthProvider.credential(
+      if (newPassword.isNotEmpty && user?.email != null) {
+        final credential = EmailAuthProvider.credential(
           email: user!.email!,
           password: currentPassword,
         );
-
-        // This validates the old password
         await user?.reauthenticateWithCredential(credential);
-        // This sets the new password
         await user?.updatePassword(newPassword);
       }
 
-      // 2. Update the photoURL if a new image was picked
       if (_imageFile != null) {
         await user?.updatePhotoURL(_imageFile!.path);
       }
 
-      // 3. Update Display Name
       final String newName = _nameController.text.trim();
       if (newName != user?.displayName) {
         await user?.updateDisplayName(newName);
       }
 
-<<<<<<< HEAD
-      // 4. Update Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .update({
-        'fullName': newName,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-=======
       if (user != null) {
-        final trimmedAge = _ageController.text.trim();
-        final parsedAge = int.tryParse(trimmedAge);
-
-        if (trimmedAge.isNotEmpty && (parsedAge == null || parsedAge < 0 || parsedAge > 130)) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Please enter a valid age (0-130).")),
-          );
-          return;
-        }
-
         await FirebaseFirestore.instance.collection('users').doc(user!.uid).set({
+          'fullName': newName,
+          'updatedAt': FieldValue.serverTimestamp(),
           'age': trimmedAge.isEmpty ? FieldValue.delete() : parsedAge,
         }, SetOptions(merge: true));
       }
 
-      // 3. Forces a reload of the user to ensure the latest data is fetched from Firebase
->>>>>>> feature/interactive_tour
       await user?.reload();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profile updated successfully!")),
+        const SnackBar(content: Text('Profile updated successfully!')),
       );
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      String message = "An error occurred";
+      String message = 'An error occurred';
       if (e.code == 'wrong-password') {
-        message = "The current password you entered is incorrect.";
+        message = 'The current password you entered is incorrect.';
       } else if (e.code == 'requires-recent-login') {
-        message = "Please re-login to change sensitive data.";
+        message = 'Please re-login to change sensitive data.';
       } else if (e.code == 'weak-password') {
-        message = "The new password is too weak.";
+        message = 'The new password is too weak.';
       }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.redAccent));
+        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _ageController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
   Future<void> _pickImage() async {
-    final XFile? pickedFile =
-        await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile == null) return;
     setState(() {
       _imageFile = File(pickedFile.path);
@@ -168,16 +132,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _ageController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-          title: const Text("Edit Profile",
-              style: TextStyle(color: Colors.black))),
+        title: const Text('Edit Profile', style: TextStyle(color: Colors.black)),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              // Added scroll view to prevent overflow with keyboard
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
@@ -192,59 +165,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ? NetworkImage(user!.photoURL!)
                               : null) as ImageProvider?,
                       child: _imageFile == null && user?.photoURL == null
-                          ? const Icon(Icons.camera_alt,
-                              size: 40, color: Colors.white)
+                          ? const Icon(Icons.camera_alt, size: 40, color: Colors.white)
                           : null,
                     ),
                   ),
-<<<<<<< HEAD
                   const SizedBox(height: 20),
+                  _buildTextField(_nameController, 'Username', Icons.person_outline),
                   _buildTextField(
-                      _nameController, "Username", Icons.person_outline),
+                    _emailController,
+                    'Email',
+                    Icons.email_outlined,
+                    inputType: TextInputType.emailAddress,
+                  ),
                   _buildTextField(
-                      _emailController, "Email", Icons.email_outlined,
-                      inputType: TextInputType.emailAddress),
-
+                    _ageController,
+                    'Age (optional)',
+                    Icons.cake_outlined,
+                    inputType: TextInputType.number,
+                  ),
                   const Divider(height: 40),
-                  const Text("Change Password",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Change Password',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 10),
-
-                  // NEW: Current Password Field
-                  _buildTextField(_currentPasswordController,
-                      "Current Password", Icons.lock_reset_outlined,
-                      isPassword: true),
-
-                  // NEW: New Password Field
-                  _buildTextField(_newPasswordController, "New Password",
-                      Icons.lock_outline,
-                      isPassword: true),
-
+                  _buildTextField(
+                    _currentPasswordController,
+                    'Current Password',
+                    Icons.lock_reset_outlined,
+                    isPassword: true,
+                  ),
+                  _buildTextField(
+                    _newPasswordController,
+                    'New Password (optional)',
+                    Icons.lock_outline,
+                    isPassword: true,
+                  ),
                   const SizedBox(height: 30),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
                       minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     ),
                     onPressed: _updateProfile,
-                    child: const Text("Save Changes",
-                        style: TextStyle(color: Colors.white)),
-=======
-                ),
-                const SizedBox(height: 20),
-                _buildTextField(_nameController, "Username", Icons.person_outline),
-                _buildTextField(_emailController, "Email", Icons.email_outlined, inputType: TextInputType.emailAddress),
-                _buildTextField(_ageController, "Age (optional)", Icons.cake_outlined, inputType: TextInputType.number),
-                _buildTextField(_passwordController, "New Password (optional)", Icons.lock_outline, isPassword: true),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
->>>>>>> feature/interactive_tour
+                    child: const Text(
+                      'Save Changes',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
               ),
@@ -253,8 +221,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _buildTextField(
-      TextEditingController controller, String label, IconData icon,
-      {bool isPassword = false, TextInputType inputType = TextInputType.text}) {
+    TextEditingController controller,
+    String label,
+    IconData icon, {
+    bool isPassword = false,
+    TextInputType inputType = TextInputType.text,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: TextField(

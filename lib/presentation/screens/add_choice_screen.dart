@@ -86,10 +86,6 @@ class AddChoiceScreen extends StatelessWidget {
         ),
         child: Column(
           children: [
-<<<<<<< HEAD
-            Icon(icon, size: 48, color: AppColors.primaryBlue),
-            SizedBox(height: 12),
-=======
             Container(
               width: 64,
               height: 64,
@@ -101,15 +97,11 @@ class AddChoiceScreen extends StatelessWidget {
               child: Icon(icon, size: 34, color: AppColors.primaryBlue),
             ),
             const SizedBox(height: 12),
->>>>>>> feature/interactive_tour
             Text(title,
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
             Text(subtitle,
                 textAlign: TextAlign.center,
-<<<<<<< HEAD
-                style: TextStyle(color: Colors.grey)),
-=======
                 style: TextStyle(color: AppColors.iconGrey.withOpacity(0.85))),
             const SizedBox(height: 12),
             Row(
@@ -127,7 +119,6 @@ class AddChoiceScreen extends StatelessWidget {
                     size: 18, color: AppColors.primaryBlue),
               ],
             ),
->>>>>>> feature/interactive_tour
           ],
         ),
       ),

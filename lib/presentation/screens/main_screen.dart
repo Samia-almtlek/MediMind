@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screens.dart';
 import 'add_choice_screen.dart';
 import '../../utils/app_colors.dart';
@@ -8,30 +10,32 @@ import 'chat_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
+  
   int _selectedIndex = 0;
+  final GlobalKey _keyHomeTab = GlobalKey();
+  final GlobalKey _keyScheduleTab = GlobalKey();
+  final GlobalKey _keyChatTab = GlobalKey();
+  final GlobalKey _keyProfileTab = GlobalKey();
+  final GlobalKey _keyAddFab = GlobalKey();
 
   // different screens for bottom navigation of the whole app
   final List<Widget> _screens = [
-    HomeScreen(),
-    ScheduleScreen(),
-    ChatScreen(),
-    ProfileScreen(),
+    const HomeScreen(), 
+    ScheduleScreen(), 
+    const ChatScreen(),
+    const ProfileScreen(),
   ];
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+  super.initState();
 
-<<<<<<< HEAD
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      DrugLoader.loadDrugsIfNeeded();
-    });
-  }
-=======
  
   WidgetsBinding.instance.addPostFrameCallback((_) {
     DrugLoader.loadDrugsIfNeeded();
@@ -160,7 +164,6 @@ TargetFocus _buildTarget({
     ],
   );
 }
->>>>>>> feature/interactive_tour
 
   void _onItemTapped(int index) {
     setState(() {
@@ -173,21 +176,21 @@ TargetFocus _buildTarget({
     return Scaffold(
       body: _screens[_selectedIndex],
       // The Floating Action Button
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-              backgroundColor: AppColors.primaryBlue,
-              child: Icon(Icons.add, color: Colors.white, size: 30),
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => AddChoiceScreen())).then((_) {
-                  setState(
-                      () {}); // Refresh the state when returning from AddChoiceScreen
-                });
-              },
-            )
-          : null,
+      floatingActionButton: _selectedIndex == 0 ? FloatingActionButton(
+        key: _keyAddFab,
+        backgroundColor: AppColors.primaryBlue,
+        child: const Icon(Icons.add, color: Colors.white, size: 30),
+        onPressed: () {
+
+  Navigator.push(
+    context, 
+    MaterialPageRoute(builder: (context) => AddChoiceScreen())
+  ) .then ((_) {
+    setState(() {}); // Refresh the state when returning from AddChoiceScreen
+  });
+
+},
+      ) : null,
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: AppColors.backgroundWhite,
         currentIndex: _selectedIndex,
@@ -195,14 +198,23 @@ TargetFocus _buildTarget({
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primaryBlue,
         unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Home'),
+        items: [
           BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month), label: 'Schedule'),
+            icon: Icon(Icons.home_filled, key: _keyHomeTab),
+            label: 'Home',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline), label: 'Chat'),
+            icon: Icon(Icons.calendar_month, key: _keyScheduleTab),
+            label: 'Schedule',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'Profile'),
+            icon: Icon(Icons.chat_bubble_outline, key: _keyChatTab),
+            label: 'Chat',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline, key: _keyProfileTab),
+            label: 'Profile',
+          ),
         ],
       ),
     );

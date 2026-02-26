@@ -25,15 +25,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-<<<<<<< HEAD
   late final AuthorizedContextProvider _contextProvider;
   late final ChatMemoryService _chatMemoryService;
   late final LmStudioChatClient _chatClient;
   String? _sessionId;
-  final GlobalKey _keyModeSwitch = GlobalKey();
-=======
   final GlobalKey _keyAssistantBadge = GlobalKey();
->>>>>>> feature/interactive_tour
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
   bool _isTyping = false; // To show typing indicator
@@ -323,18 +319,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-<<<<<<< HEAD
     String response;
-=======
-    // Simulate AI response after a short delay
-    Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isTyping = false;
-          String response = userText.toLowerCase().contains('aspirin')
-              ? "Aspirin may interact with blood thinners and some anti-inflammatory drugs. If you are combining treatments, check with your doctor or pharmacist first."
-              : "Thanks for your question. I can help with dosage timing, interactions, and safe usage tips. If symptoms are urgent, contact a healthcare professional directly.";
->>>>>>> feature/interactive_tour
 
     try {
       final endpoint = LmStudioConfig.completionUri;
@@ -443,7 +428,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       response = await _chatClient.complete(
         endpoint: endpoint,
-        model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+        model: LmStudioModels.detailed,
         authorizedContext: authorizedContext,
         extraContext: extraContextForRequest,
         question: userText,
@@ -458,7 +443,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
         response = await _chatClient.complete(
           endpoint: endpoint,
-          model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+          model: LmStudioModels.detailed,
           authorizedContext: authorizedContext,
           extraContext: '',
           question: retryQuestion,

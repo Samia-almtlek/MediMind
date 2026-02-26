@@ -38,7 +38,7 @@ class PrivacyScreen extends StatelessWidget {
         );
         await user.reauthenticateWithCredential(credential);
         await _deleteEverything(context);
-      } on FirebaseAuthException catch (e) {
+      } on FirebaseAuthException {
         String errorMessage = "Incorrect password.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),

@@ -1,70 +1,37 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/global_data.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-<<<<<<< HEAD
-import 'dart:async';
-import '../../domain/entities/dose_log_entity.dart';
-import '../../data/models/dose_log_model.dart';
-import '../../data/repositories_impl/dose_log_repository_impl.dart';
-import '../../service/database/firestore_service.dart';
-import '../../core/widgets/speaker_button.dart';
-=======
 import 'package:medimind/service/pdf_service.dart';
 import 'manual_input_screen.dart';
->>>>>>> feature/interactive_tour
 
+// Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  DateTime selectedDate = DateTime.now();
+  DateTime selectedDate = DateTime.now(); // day the user is viewing
   DateTime today = DateTime.now();
+  //dit is nu een lege lijst om later te vullen via de API of db
+  List<Medication> activeMeds = [];
+  List<TargetFocus> targets = [];
+  final GlobalKey keyMenu = GlobalKey();
+  final GlobalKey keyCalendar = GlobalKey();
+  final GlobalKey keyCheckmark = GlobalKey();
 
-  List<DoseLogEntity> allDoses = [];
-
-  final ScrollController _scrollController =
-      ScrollController(initialScrollOffset: 500 * 68.0 - 150);
-
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _doseSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDoseStream();
-  }
-
-  void _loadDoseStream() {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserId == null) return;
-
-    _doseSubscription = FirebaseFirestore.instance
-        .collectionGroup('dose_logs')
-        .where('userId', isEqualTo: currentUserId)
-        .snapshots()
-        .listen((snapshot) {
-      if (!mounted) return;
-
-      final tempList = snapshot.docs
-          .where((doc) => doc.data() != null)
-          .map((doc) => DoseLogModel.fromFirestore(doc))
-          .toList();
-
-      setState(() {
-        allDoses = tempList;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _doseSubscription?.cancel();
-    _scrollController.dispose();
-    super.dispose();
-  }
+  final ScrollController _scrollController = ScrollController(
+    initialScrollOffset: 500 * 68.0 - 150,
+  );
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _medicationsSubscription;
 
   String _getMonthName(DateTime date) {
     List<String> months = [
@@ -84,12 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return "${months[date.month - 1]} ${date.year}";
   }
 
-<<<<<<< HEAD
-  List<DoseLogEntity> _getDosesForSelectedDate() {
-    return allDoses.where((dose) {
-      return DateUtils.isSameDay(dose.geplandeTijd, selectedDate);
-    }).toList();
-=======
   @override
   void initState() {
     super.initState();
@@ -611,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ManualInputScreen(medicationToEdit: med),
+                                        builder: (context) => ManualInputScreen(),
                                       ),
                                     );
                                   },
@@ -665,25 +626,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
->>>>>>> feature/interactive_tour
   }
 
   @override
   Widget build(BuildContext context) {
-    final dosesForDay = _getDosesForSelectedDate();
-
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Today",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: AppColors.backgroundWhite,
         elevation: 0,
-<<<<<<< HEAD
-=======
         actions: [
           Container(
             key: keyMenu,
@@ -700,72 +656,90 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
->>>>>>> feature/interactive_tour
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // De Maand-indicator
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: Text(
               _getMonthName(selectedDate),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppColors.iconGrey,
               ),
             ),
           ),
-          _buildHorizontalCalendar(),
+
+          _buildHorizontalCalendar(calendarTileKey: keyCalendar),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             child: Text(
               DateUtils.isSameDay(selectedDate, today)
                   ? "Today's Schedule"
                   : "Schedule for ${selectedDate.day} ${_getMonthName(selectedDate).split(' ')[0]}",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
+
+          //  Lijst (of Empty State)
           Expanded(
-            child: dosesForDay.isEmpty
-                ? Center(
-                    child: Text(
-                      "No medication scheduled for this day.",
-                      style: TextStyle(color: Colors.grey),
+            child: _getListForSelectedDate().isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          "No medication scheduled for this day.",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
                     ),
                   )
-                : _buildDoseList(dosesForDay),
+                : _buildMedicationList(_getListForSelectedDate()),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHorizontalCalendar() {
-    return Container(
+  // Builds a horizontal calendar automatically
+  Widget _buildHorizontalCalendar({Key? calendarTileKey}) {
+    return SizedBox(
       height: 100,
       child: ListView.builder(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
+          //  berekent de datum voor elke kaart relatief aan vandaag
+          // index 500 is vandaag, lager is verleden, hoger is toekomst
           DateTime dateToShow = today.add(Duration(days: index - 500));
-
           bool isSelected = DateUtils.isSameDay(dateToShow, selectedDate);
           bool isToday = DateUtils.isSameDay(dateToShow, today);
 
           List<String> days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
           String dayName = days[dateToShow.weekday - 1];
 
           return GestureDetector(
             onTap: () {
               setState(() {
                 selectedDate = dateToShow;
+                // Hier filteren we later de data uit database
               });
             },
             child: Container(
+              key: index == 500 ? calendarTileKey : null,
               width: 60,
-              margin: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppColors.primaryBlue
@@ -778,15 +752,21 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(dayName,
-                      style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey,
-                          fontSize: 12)),
-                  Text("${dateToShow.day}",
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : Colors.black)),
+                  Text(
+                    dayName,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    "${dateToShow.day}",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.white : Colors.black,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -796,83 +776,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDoseList(List<DoseLogEntity> doses) {
+  // Builds the list of medications for the day
+  Widget _buildMedicationList(List<Medication> meds) {
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16),
-      itemCount: doses.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: meds.length,
       itemBuilder: (context, index) {
-        final dose = doses[index];
-
-        String formattedTime =
-            "${dose.geplandeTijd.hour.toString().padLeft(2, '0')}:"
-            "${dose.geplandeTijd.minute.toString().padLeft(2, '0')}";
-
+        final med = meds[index];
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.lightTeal.withOpacity(0.4),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Row(
             children: [
+              // Time on the left side
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(formattedTime,
-                      style: TextStyle(
+                  Text(med.time,
+                      style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primaryBlue)),
-                  Text("Scheduled",
+                  const Text("Scheduled",
                       style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
-              SizedBox(width: 20),
+              const SizedBox(width: 20),
+              // Medication name and dosage
               Expanded(
-                child: StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('user_medications')
-                      .doc(dose.medicatieId)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return Text("Loading...");
-                    }
-
-                    if (!snapshot.hasData || !snapshot.data!.exists) {
-                      return Text(
-                        "Deleted medication",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      );
-                    }
-
-                    final data = snapshot.data!.data() as Map<String, dynamic>;
-
-                    return Text(
-                      data['name'] ?? "Unknown",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    );
-                  },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(med.name,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(med.dosage, style: const TextStyle(color: Colors.black54)),
+                  ],
                 ),
               ),
+              // Checkbox from prototype
               Transform.scale(
                 scale: 1.2,
                 child: Checkbox(
-                  value: dose.status == 'taken',
+                  key: index == 0 ? keyCheckmark : null,
+                  //check if the current date (at midnight) is in the completedDates list for this medication
+                  value: med.completedDates
+                      .any((d) => DateUtils.isSameDay(d, selectedDate)),
                   activeColor: AppColors.primaryBlue,
-                  onChanged: (value) async {
-                    final repository =
-                        DoseLogRepositoryImpl(FirestoreService());
-
-                    if (value == true) {
-                      await repository.markAsTaken(dose.medicatieId, dose.id);
-                    } else {
-                      await repository.markAsPending(dose.medicatieId, dose.id);
-                    }
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
+                  onChanged: (bool? value) async {
+                    await _toggleMedicationCompletion(med, value ?? false);
                   },
                 ),
               ),
@@ -881,5 +838,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Dit zorgt ervoor dat telkens wanneer we terugkomen op dit scherm (bijvoorbeeld na Navigator.pop of switch in navbar), de UI ververst.
+    setState(() {});
   }
 }

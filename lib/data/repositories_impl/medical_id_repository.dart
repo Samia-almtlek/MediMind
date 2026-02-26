@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../data/models/medical_id_model.dart';
-import 'caregiver_repository_impl.dart';
 import '../../data/models/caregiver_model.dart';
 class MedicalRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../service/database/firestore_service.dart';
 import '../../domain/entities/user_medication_entity.dart';
 import '../../domain/repositories/user_medication_repository.dart';
