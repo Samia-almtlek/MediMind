@@ -175,11 +175,7 @@ class ScheduleScreen extends StatelessWidget {
 
                 SizedBox(height: 6),
 
-                /// 🔥 REFILL BUTTON
-                ElevatedButton(
-                  onPressed: () => _showRefillDialog(context, med),
-                  child: Text("Refill"),
-                ),
+                
               ],
             ),
           ),
