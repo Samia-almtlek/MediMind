@@ -8,16 +8,19 @@ import '../../domain/entities/user_medication_entity.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../service/notifications/dose_generation_service.dart';
 import '../../core/widgets/speaker_button.dart';
+import '../../domain/models/medication.dart';
 
 class TreatmentDurationScreen extends StatefulWidget {
   final String medicationName;
   final String dosage;
   final String? notes;
+  final Medication? medicationToEdit;
 
   TreatmentDurationScreen({
     required this.medicationName,
     required this.dosage,
     this.notes,
+    this.medicationToEdit,
   });
 
   @override
@@ -31,8 +34,97 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   int customDays = 0;
   int frequency = 1;
   int? currentStock; // 🆕 STOCK
+  int _initialStock = 0;
 
   List<TimeOfDay> selectedTimes = [TimeOfDay(hour: 8, minute: 0)];
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillForEditIfNeeded();
+  }
+
+  Future<void> _prefillForEditIfNeeded() async {
+    final med = widget.medicationToEdit;
+    if (med == null) return;
+
+    final daysDiff = med.endDate.difference(med.startDate).inDays + 1;
+    if (daysDiff == 7) {
+      selectedDuration = '7 days';
+    } else if (daysDiff == 14) {
+      selectedDuration = '14 days';
+    } else if (daysDiff == 30) {
+      selectedDuration = '30 days';
+    } else {
+      selectedDuration = 'Custom';
+      customDays = daysDiff;
+    }
+
+    final freqMatch = RegExp(r'\d+').firstMatch(med.frequency);
+    frequency = int.tryParse(freqMatch?.group(0) ?? '') ?? 1;
+
+    final extractedTimes = _extractTimesFromInstructions(med.instructions);
+    if (extractedTimes.isNotEmpty) {
+      selectedTimes = extractedTimes;
+    } else {
+      selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
+    }
+
+    if (med.id.isNotEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('user_medications')
+            .doc(med.id)
+            .get();
+        final data = doc.data();
+        if (data != null && mounted) {
+          setState(() {
+            currentStock = (data['currentStock'] as num?)?.toInt() ?? 0;
+            _initialStock = (data['initialStock'] as num?)?.toInt() ?? currentStock ?? 0;
+          });
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) setState(() {});
+  }
+
+  List<TimeOfDay> _extractTimesFromInstructions(String instructions) {
+    String source = instructions;
+    if (source.contains('Times:')) {
+      source = source.split('Times:').last;
+      if (source.contains('Notes:')) {
+        source = source.split('Notes:').first;
+      }
+    }
+
+    final times = source
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    final parsed = <TimeOfDay>[];
+    for (final t in times) {
+      final hhmm = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(t);
+      if (hhmm != null) {
+        final h = int.tryParse(hhmm.group(1)!) ?? 8;
+        final m = int.tryParse(hhmm.group(2)!) ?? 0;
+        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+          parsed.add(TimeOfDay(hour: h, minute: m));
+        }
+      }
+    }
+    return parsed;
+  }
+
+  String _buildInstructionsText() {
+    final times = selectedTimes
+        .map((t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+        .join(', ');
+    final note = widget.notes?.trim();
+    return 'Times: $times. Notes: ${note == null || note.isEmpty ? '-' : note}';
+  }
 
   void _updateTimeSuggestions(int newFrequency) {
     setState(() {
@@ -84,7 +176,10 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text("Schedule Logic", style: TextStyle(color: Colors.black)),
+        title: Text(
+          widget.medicationToEdit != null ? 'Edit Schedule' : 'Schedule Logic',
+          style: TextStyle(color: Colors.black),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -182,38 +277,87 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                   }
 
                   final String uid = user.uid;
+                  final intakeTimes = selectedTimes
+                      .map((t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+                      .toList();
+                  final instructionsText = _buildInstructionsText();
 
-                  final newMedication = UserMedicationEntity(
-                    id: FirebaseFirestore.instance
+                  if (widget.medicationToEdit != null && widget.medicationToEdit!.id.isNotEmpty) {
+                    final medId = widget.medicationToEdit!.id;
+
+                    await FirebaseFirestore.instance
                         .collection('user_medications')
-                        .doc()
-                        .id,
-                    userId: uid,
-                    productId: "",
-                    name: widget.medicationName,
-                    dosage: widget.dosage,
-                    frequencyPerDay: frequency,
-                    startDate: startDate,
-                    endDate: calculatedEndDate,
-                    instructions: widget.notes,
-                    intakeTimes: selectedTimes
-                        .map((t) =>
-                            "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}")
-                        .toList(),
-                    isActive: true,
-                    aangemaaktViaOCR: false,
+                        .doc(medId)
+                        .update({
+                      'name': widget.medicationName,
+                      'dosage': widget.dosage,
+                      'frequencyPerDay': frequency,
+                      'startDate': startDate,
+                      'endDate': calculatedEndDate,
+                      'instructions': instructionsText,
+                      'intakeTimes': intakeTimes,
+                      'currentStock': currentStock,
+                      'initialStock': _initialStock == 0 ? currentStock : _initialStock,
+                    });
 
-                    // 🆕 STOCK VALUES
-                    initialStock: currentStock!,
-                    currentStock: currentStock!,
-                    lowStockThresholdDays: 3,
-                    lastStockAlertAt: null,
-                  );
+                    final oldDoseLogs = await FirebaseFirestore.instance
+                        .collection('user_medications')
+                        .doc(medId)
+                        .collection('dose_logs')
+                        .get();
+                    for (final doc in oldDoseLogs.docs) {
+                      await doc.reference.delete();
+                    }
 
-                  await repository.addUserMedication(newMedication);
+                    final updatedMedication = UserMedicationEntity(
+                      id: medId,
+                      userId: uid,
+                      productId: '',
+                      name: widget.medicationName,
+                      dosage: widget.dosage,
+                      frequencyPerDay: frequency,
+                      startDate: startDate,
+                      endDate: calculatedEndDate,
+                      instructions: instructionsText,
+                      intakeTimes: intakeTimes,
+                      isActive: true,
+                      aangemaaktViaOCR: false,
+                      initialStock: _initialStock == 0 ? currentStock! : _initialStock,
+                      currentStock: currentStock!,
+                      lowStockThresholdDays: 3,
+                      lastStockAlertAt: null,
+                    );
 
-                  final generator = DoseGenerationService();
-                  await generator.generateDoses(newMedication);
+                    final generator = DoseGenerationService();
+                    await generator.generateDoses(updatedMedication);
+                  } else {
+                    final newMedication = UserMedicationEntity(
+                      id: FirebaseFirestore.instance
+                          .collection('user_medications')
+                          .doc()
+                          .id,
+                      userId: uid,
+                      productId: "",
+                      name: widget.medicationName,
+                      dosage: widget.dosage,
+                      frequencyPerDay: frequency,
+                      startDate: startDate,
+                      endDate: calculatedEndDate,
+                      instructions: instructionsText,
+                      intakeTimes: intakeTimes,
+                      isActive: true,
+                      aangemaaktViaOCR: false,
+                      initialStock: currentStock!,
+                      currentStock: currentStock!,
+                      lowStockThresholdDays: 3,
+                      lastStockAlertAt: null,
+                    );
+
+                    await repository.addUserMedication(newMedication);
+
+                    final generator = DoseGenerationService();
+                    await generator.generateDoses(newMedication);
+                  }
 
                   Navigator.push(
                     context,

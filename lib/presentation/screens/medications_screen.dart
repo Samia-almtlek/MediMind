@@ -201,6 +201,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showRefillDialog(
       BuildContext context, UserMedicationModel med) {
 

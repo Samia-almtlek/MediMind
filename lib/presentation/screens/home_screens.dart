@@ -62,8 +62,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _loadInitialData() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (!mounted) return;
+      setState(() {
+        userAddedMeds = [];
+      });
+      return;
+    }
+
     _medicationsSubscription = FirebaseFirestore.instance
         .collection('user_medications')
+        .where('userId', isEqualTo: uid)
         .snapshots()
         .listen((snapshot) {
       for (var doc in snapshot.docs) {
@@ -76,6 +86,34 @@ class _HomeScreenState extends State<HomeScreen> {
             snapshot.docs.map((doc) => Medication.fromFirestore(doc)).toList();
       });
     });
+  }
+
+  List<String> _extractTimesForMedication(Medication med) {
+    final raw = med.instructions.trim();
+
+    if (raw.contains('Times:')) {
+      final afterTimes = raw.split('Times:').last;
+      final timesPart = afterTimes.contains('Notes:')
+          ? afterTimes.split('Notes:').first
+          : afterTimes;
+
+      final parsedTimes = timesPart
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      if (parsedTimes.isNotEmpty) {
+        return parsedTimes;
+      }
+    }
+
+    final fallbackTime = med.time.trim();
+    if (fallbackTime.isNotEmpty && fallbackTime.toLowerCase() != 'not set') {
+      return [fallbackTime];
+    }
+
+    return ['Time not set'];
   }
 
   @override
@@ -234,13 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
           DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
 
       if (!current.isBefore(start) && !current.isAfter(end)) {
-        // 2. Split the instructions string into individual times
-        // Extracts "8:00 AM, 4:00 PM, 12:00 AM" from "Times: 8:00 AM... Notes:"
-        String timePart = med.instructions
-            .split("Notes:")[0]
-            .replaceAll("Times: ", "")
-            .trim();
-        List<String> allTimes = timePart.split(", ");
+        final allTimes = _extractTimesForMedication(med);
 
         for (String individualTime in allTimes) {
           // Create a temporary copy for the UI to display each time separately
@@ -572,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ManualInputScreen(),
+                                        builder: (context) => ManualInputScreen(medicationToEdit: med),
                                       ),
                                     );
                                   },
@@ -610,8 +642,6 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
             onPressed: () async {
-              Navigator.pop(context);
-              Navigator.pop(context);
               await _deleteMedication(med);
               ScaffoldMessenger.of(this.context).showSnackBar(
                 SnackBar(

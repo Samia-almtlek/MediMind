@@ -186,6 +186,7 @@ class ScheduleScreen extends StatelessWidget {
   }
 
   /// 🔥 REFILL DIALOG
+  // ignore: unused_element
   void _showRefillDialog(BuildContext context, UserMedicationModel med) {
     final controller = TextEditingController();
 
