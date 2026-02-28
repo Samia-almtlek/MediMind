@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
 import '../../core/widgets/speaker_button.dart';
-
+import 'package:medimind/core/service/tts_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -471,6 +471,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+      TTSService.instance.stopIfSpeaking();
     _controller.dispose();
     _scrollController.dispose();
     _chatClient.dispose();

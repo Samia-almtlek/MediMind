@@ -15,7 +15,7 @@ class _NotificationSettingsScreenState
   bool _medicationReminders = true;
   bool _stockAlerts = true;
   bool _aiTips = false;
-
+  bool _voiceReminder = false;
   TimeOfDay _summaryTime = const TimeOfDay(hour: 8, minute: 0);
   late Box _settingsBox;
 
@@ -28,6 +28,7 @@ class _NotificationSettingsScreenState
 
   void _loadSettings() {
     final savedTime = _settingsBox.get('summaryTime');
+
     if (savedTime != null) {
       final parts = savedTime.split(':');
       setState(() {
@@ -35,6 +36,11 @@ class _NotificationSettingsScreenState
             TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
       });
     }
+    final savedVoice = _settingsBox.get('voiceEnabled', defaultValue: false);
+
+    setState(() {
+      _voiceReminder = savedVoice;
+    });
   }
 
   Future<void> _selectTime(BuildContext context) async {
@@ -97,7 +103,17 @@ class _NotificationSettingsScreenState
             _aiTips,
             (val) => setState(() => _aiTips = val),
           ),
-
+          _buildSwitchTile(
+            "Voice Reminder",
+            "Play a voice message when tapping notification",
+            _voiceReminder,
+            (val) {
+              _settingsBox.put('voiceEnabled', val);
+              setState(() {
+                _voiceReminder = val;
+              });
+            },
+          ),
           // 🔒 NEW LOCK SCREEN TOGGLE
           _buildSwitchTile(
             "Hide Sensitive Content",

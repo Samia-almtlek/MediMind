@@ -8,6 +8,7 @@ import '../../data/models/dose_log_model.dart';
 import '../../data/repositories_impl/dose_log_repository_impl.dart';
 import '../../service/database/firestore_service.dart';
 import '../../core/widgets/speaker_button.dart';
+import '../../core/service/tts_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -56,11 +57,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+      TTSService.instance.stopIfSpeaking();
     _doseSubscription?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
-
+@override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  TTSService.instance.stopIfSpeaking();
+}
   String _getMonthName(DateTime date) {
     List<String> months = [
       "January",
@@ -249,11 +255,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     final data = snapshot.data!.data() as Map<String, dynamic>;
 
-                    return Text(
-                      data['name'] ?? "Unknown",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    );
+                    final medName = data['name'] ?? "Unknown";
+
+return Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    Expanded(
+      child: Text(
+        medName,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
+    SpeakerButton(
+text: "Your medication $medName is scheduled at $formattedTime.",      color: Colors.grey[600],
+    ),
+  ],
+);
                   },
                 ),
               ),

@@ -7,21 +7,22 @@ import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
 import '../../domain/models/medication.dart';
 import '../../core/widgets/speaker_button.dart';
+import '../../core/service/tts_service.dart';
 
-class ScheduleScreen extends StatelessWidget {
-  String _buildScheduleSummary(List<Medication> meds) {
-    if (meds.isEmpty) {
-      return "You currently have no active treatment plans.";
-    }
+class ScheduleScreen extends StatefulWidget {
+  const ScheduleScreen({super.key});
 
-    String summary = "Your treatment plan includes ";
+  @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
 
-    for (var med in meds) {
-      summary +=
-          "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}. ";
-    }
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  List<UserMedicationModel> _currentMeds = [];
 
-    return summary;
+  @override
+  void dispose() {
+    TTSService.instance.stopIfSpeaking();
+    super.dispose();
   }
 
   @override
@@ -31,13 +32,57 @@ class ScheduleScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           "Treatment Plan",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
+            onPressed: () {
+  final activeMeds = _currentMeds.where((med) {
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+
+    final endDateOnly = DateTime(
+      (med.endDate ?? med.startDate).year,
+      (med.endDate ?? med.startDate).month,
+      (med.endDate ?? med.startDate).day,
+    );
+
+    final isDatePassed = today.isAfter(endDateOnly);
+    return !isDatePassed && med.isActive;
+  }).toList();
+
+  if (activeMeds.isEmpty) {
+    TTSService.instance.speak(
+      "You currently have no active treatment plans."
+    );
+    return;
+  }
+
+  String summary =
+      "You have ${activeMeds.length} active medications. ";
+
+  for (var med in activeMeds) {
+    summary +=
+        "${med.name}, dosage ${med.dosage}, scheduled at ${med.intakeTimes.join(", ")}. ";
+
+    if (med.currentStock <= med.lowStockThresholdDays) {
+      summary += "Warning. Low stock for ${med.name}. ";
+    }
+  }
+
+  TTSService.instance.speak(summary);
+},
+          ),
+        ],
       ),
       body: uid == null
           ? _buildEmptyState()
@@ -54,12 +99,11 @@ class ScheduleScreen extends StatelessWidget {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState();
                 }
-
-                final List<UserMedicationModel> meds = snapshot.data!.docs
+                _currentMeds = snapshot.data!.docs
                     .map((doc) => UserMedicationModel.fromFirestore(doc))
                     .toList();
 
-                return _buildGroupedTreatmentList(meds, context);
+                return _buildGroupedTreatmentList(_currentMeds, context);
               },
             ),
     );

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../utils/app_colors.dart';
-
+import '../../core/service/tts_service.dart';
+import '../../core/widgets/speaker_button.dart';
 class MedicationsScreen extends StatefulWidget {
   const MedicationsScreen({super.key});
 
@@ -29,6 +30,7 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
 
   @override
   void dispose() {
+      TTSService.instance.stopIfSpeaking();
     _nameController.dispose();
     _dosageController.dispose();
     _stockController.dispose();
@@ -312,10 +314,39 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
             children: [
               Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.medication, color: statusColor)),
               const SizedBox(width: 15),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(med['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(med['dosage'], style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-              ])),
+             Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              med['name'],
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          SpeakerButton(
+            text:
+                "Medication ${med['name']}, dosage ${med['dosage']}. You have ${med['currentStock']} out of ${med['maxStock']} remaining.",
+            size: 18,
+            color: Colors.grey[600],
+          ),
+        ],
+      ),
+      Text(
+        med['dosage'],
+        style: TextStyle(
+          color: Colors.grey[500],
+          fontSize: 12,
+        ),
+      ),
+    ],
+  ),
+),
               Text("${med['currentStock']}/${med['maxStock']}", style: TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
             ],
           ),

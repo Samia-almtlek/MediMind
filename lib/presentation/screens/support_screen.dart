@@ -3,7 +3,7 @@ import '../../utils/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/support_ticket_model.dart';
-
+import '../../core/service/tts_service.dart';
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
 
@@ -36,10 +36,16 @@ class _SupportScreenState extends State<SupportScreen> {
     },
   ];
 
+@override
+void dispose() {
+  TTSService.instance.stopIfSpeaking();
+  super.dispose();
+}
   // Houdt bij welke FAQ opengeklapt is
   int? _expandedIndex;
 
   void _showContactForm() {
+    TTSService.instance.stopIfSpeaking();
     final _formKey = GlobalKey<FormState>();
     final _messageController = TextEditingController();
 
@@ -150,15 +156,28 @@ class _SupportScreenState extends State<SupportScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: const Text("Support",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+  title: const Text(
+    "Support",
+    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+  ),
+  backgroundColor: Colors.white,
+  elevation: 0.5,
+  leading: IconButton(
+    icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+    onPressed: () => Navigator.pop(context),
+  ),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
+      onPressed: () {
+        TTSService.instance.stopIfSpeaking();
+        TTSService.instance.speak(
+          "Support screen. You can browse frequently asked questions or open a support ticket to contact our team."
+        );
+      },
+    ),
+  ],
+),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -228,10 +247,16 @@ class _SupportScreenState extends State<SupportScreen> {
             trailing: Icon(isExpanded ? Icons.remove : Icons.add,
                 color: AppColors.primaryBlue),
             onTap: () {
-              setState(() {
-                _expandedIndex = isExpanded ? null : index;
-              });
-            },
+  setState(() {
+    _expandedIndex = isExpanded ? null : index;
+  });
+  TTSService.instance.stopIfSpeaking();
+  if (!isExpanded) {
+    TTSService.instance.speak(
+      _faqs[index]['answer']!,
+    );
+  }
+},
           ),
           if (isExpanded)
             Padding(

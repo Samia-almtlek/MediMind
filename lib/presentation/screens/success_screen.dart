@@ -1,10 +1,38 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import '../../core/service/tts_service.dart';
 
-class SuccessScreen extends StatelessWidget {
+class SuccessScreen extends StatefulWidget {
   final String medicationName;
 
-  const SuccessScreen({super.key, required this.medicationName});
+  const SuccessScreen({
+    super.key,
+    required this.medicationName,
+  });
+
+  @override
+  State<SuccessScreen> createState() => _SuccessScreenState();
+}
+
+class _SuccessScreenState extends State<SuccessScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      TTSService.instance.stopIfSpeaking();
+      TTSService.instance.speak(
+        "${widget.medicationName} has been successfully added to your schedule."
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    TTSService.instance.stopIfSpeaking();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +44,6 @@ class SuccessScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // a circular container with check 
               Container(
                 width: 100,
                 height: 100,
@@ -37,12 +64,11 @@ class SuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                "$medicationName has been successfully added to your schedule.",
+                "${widget.medicationName} has been successfully added to your schedule.",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               const SizedBox(height: 50),
-        
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -54,12 +80,15 @@ class SuccessScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    // this clears all screens in the 'stack' and goes back to the home page
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                   child: const Text(
                     "Back to Home",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
