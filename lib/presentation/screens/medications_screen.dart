@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart';
-
+import '../../core/service/tts_service.dart';
 class MedicationsScreen extends StatefulWidget {
   const MedicationsScreen({super.key});
 
@@ -12,7 +12,11 @@ class MedicationsScreen extends StatefulWidget {
 }
 
 class _MedicationsScreenState extends State<MedicationsScreen> {
-
+@override
+void dispose() {
+  TTSService.instance.stopIfSpeaking();
+  super.dispose();
+}
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -20,19 +24,62 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: const Text(
-          "My Cabinet",
-          style: TextStyle(
-              color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios,
-              color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+  title: const Text(
+    "My Cabinet",
+    style: TextStyle(
+        color: Colors.black,
+        fontWeight: FontWeight.bold),
+  ),
+  backgroundColor: Colors.white,
+  elevation: 0.5,
+  leading: IconButton(
+    icon: const Icon(Icons.arrow_back_ios,
+        color: Colors.black, size: 20),
+    onPressed: () => Navigator.pop(context),
+  ),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.volume_up,
+          color: AppColors.primaryBlue),
+      onPressed: () async {
+        await TTSService.instance.stopIfSpeaking();
+
+        final uid =
+            FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) return;
+
+        final snapshot =
+            await FirebaseFirestore.instance
+                .collection('user_medications')
+                .where('userId', isEqualTo: uid)
+                .where('isActive', isEqualTo: true)
+                .get();
+
+        if (snapshot.docs.isEmpty) {
+          await TTSService.instance
+              .speak("Your cabinet is currently empty.");
+          return;
+        }
+
+        final meds = snapshot.docs
+            .map((doc) =>
+                UserMedicationModel.fromFirestore(doc))
+            .toList();
+
+        String summary =
+            "You have ${meds.length} medications in your cabinet. ";
+
+        for (var med in meds) {
+          summary +=
+              "${med.name}, dosage ${med.dosage}, "
+              "current stock ${med.currentStock}. ";
+        }
+
+        await TTSService.instance.speak(summary);
+      },
+    ),
+  ],
+),
       body: uid == null
           ? _buildEmptyState()
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
