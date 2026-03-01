@@ -9,6 +9,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medimind/service/pdf_service.dart';
 import 'manual_input_screen.dart';
+import '../../core/service/tts_service.dart';
+
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -836,17 +838,42 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 20),
               // Medication name and dosage
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(med.name,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(med.dosage, style: const TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
+             Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              med.name,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.volume_up,
+              color: AppColors.primaryBlue,
+              size: 20,
+            ),
+            onPressed: () async {
+              await TTSService.instance.stopIfSpeaking();
+
+              await TTSService.instance.speak(
+                "${med.name}, scheduled at ${med.time}"
+              );
+            },
+          ),
+        ],
+      ),
+      Text(
+        med.dosage,
+        style: const TextStyle(color: Colors.black54),
+      ),
+    ],
+  ),
+),
               // Checkbox from prototype
               Transform.scale(
                 scale: 1.2,

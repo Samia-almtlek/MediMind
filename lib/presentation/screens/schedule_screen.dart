@@ -5,8 +5,19 @@ import 'package:intl/intl.dart';
 
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
+import '../../core/service/tts_service.dart';
 
-class ScheduleScreen extends StatelessWidget {
+
+class ScheduleScreen extends StatefulWidget {
+  const ScheduleScreen({super.key});
+
+  @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  List<UserMedicationModel> _currentMeds = []; 
+  
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;

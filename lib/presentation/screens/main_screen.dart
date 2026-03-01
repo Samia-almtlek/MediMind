@@ -168,6 +168,7 @@ TargetFocus _buildTarget({
 }
 
   void _onItemTapped(int index) {
+    
      TTSService.instance.stopIfSpeaking();
     setState(() {
       _selectedIndex = index;

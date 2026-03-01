@@ -6,6 +6,7 @@ import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'edit_profile_screen.dart';
+import '../../core/service/tts_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -25,7 +26,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final GlobalKey _keyPrivacy = GlobalKey();
   final GlobalKey _keySupport = GlobalKey();
   final GlobalKey _keyLogout = GlobalKey();
+String _buildProfileSummary(User? user) {
+  final buffer = StringBuffer();
 
+  buffer.writeln("This is your profile page.");
+
+  buffer.writeln("User name: ${user?.displayName ?? "MediMind User"}.");
+  buffer.writeln("Email: ${user?.email ?? "No email provided"}.");
+
+  buffer.writeln("Account settings section.");
+  buffer.writeln("Personal data. Update your personal information.");
+
+  buffer.writeln("Manage health section.");
+  buffer.writeln("My cabinet. Track your active treatments.");
+  buffer.writeln("Medical ID. Emergency contact and blood type.");
+
+  buffer.writeln("Preferences section.");
+  buffer.writeln("Notifications are ${_notificationsEnabled ? "enabled" : "disabled"}.");
+  buffer.writeln("Privacy and data settings.");
+
+  buffer.writeln("Account section.");
+  buffer.writeln("Support and frequently asked questions.");
+  buffer.writeln("Logout option available.");
+
+  return buffer.toString();
+}
   @override
   void initState() {
     super.initState();
@@ -275,15 +300,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(
-        title: const Text(
-          "My Profile",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        centerTitle: true,
-      ),
+     appBar: AppBar(
+  title: const Text(
+    "My Profile",
+    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+  ),
+  backgroundColor: Colors.white,
+  elevation: 0.5,
+  centerTitle: true,
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
+      onPressed: () async {
+        await TTSService.instance.stopIfSpeaking();
+
+        final text = _buildProfileSummary(user);
+
+        await TTSService.instance.speak(text);
+      },
+    ),
+  ],
+),
       body: SingleChildScrollView(
         controller: _scrollController,
         child: Column(
@@ -375,7 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSectionHeader("Manage Health"),
             _buildProfileItem(
               icon: Icons.health_and_safety_outlined,
-              title: "My Medications",
+              title: "My Cabinet",
               subtitle: "Track your active treatments",
               leadingKey: _keyMyMedications,
               onTap: () => Navigator.pushNamed(context, '/medications'),
