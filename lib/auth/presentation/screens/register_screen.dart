@@ -120,6 +120,39 @@ if (!_isValidEmail(_emailController.text.trim())) {
                   children: [
                     const SizedBox(height: 60),
 
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightTeal,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.contain,
+                          isAntiAlias: true,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    const Center(
+                      child: Text(
+                        "MediMind",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
                     // Title
                     const Center(
                       child: Text(

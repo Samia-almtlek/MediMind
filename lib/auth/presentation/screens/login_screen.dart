@@ -192,15 +192,18 @@ ScaffoldMessenger.of(this.context).showSnackBar(
 
               // Logo
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppColors.lightTeal,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.favorite_border,
-                  size: 40,
-                  color: AppColors.primaryBlue,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  width: 56,
+                  height: 56,
+                  fit: BoxFit.contain,
+                  isAntiAlias: true,
+                  filterQuality: FilterQuality.high,
                 ),
               ),
 
