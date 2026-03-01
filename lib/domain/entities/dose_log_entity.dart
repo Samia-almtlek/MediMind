@@ -16,6 +16,10 @@ class DoseLogEntity {
   final DateTime? escalatieTijd;
 
   final List<int> scheduledNotificationIds;
+  final double? takenAmountValue;
+  final String? takenAmountUnit;
+  final String? takenAmountText;
+  final String? source;
 
   final DocumentReference<Map<String, dynamic>>? reference;
 
@@ -31,6 +35,10 @@ class DoseLogEntity {
     this.escalatieVerzonden = false,
     this.escalatieTijd,
     this.scheduledNotificationIds = const [],
+    this.takenAmountValue,
+    this.takenAmountUnit,
+    this.takenAmountText,
+    this.source,
     this.reference,
   });
 }

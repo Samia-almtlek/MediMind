@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:medimind/service/chatbot/authorized_context_provider.dart';
+import 'package:medimind/service/chatbot/chat_dose_logging_service.dart';
 import 'package:medimind/service/chatbot/chat_memory_service.dart';
 import 'package:medimind/service/chatbot/chatbot_prompts.dart';
 import 'package:medimind/service/chatbot/lm_studio_chat_client.dart';
@@ -28,7 +29,10 @@ class _ChatScreenState extends State<ChatScreen> {
   late final AuthorizedContextProvider _contextProvider;
   late final ChatMemoryService _chatMemoryService;
   late final LmStudioChatClient _chatClient;
+  late final ChatDoseLoggingService _doseLoggingService;
   String? _sessionId;
+  _PendingDoseAmountRequest? _pendingDoseAmountRequest;
+  _PendingDoseAmbiguityRequest? _pendingDoseAmbiguityRequest;
   final GlobalKey _keyModeSwitch = GlobalKey();
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
@@ -125,6 +129,10 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _chatClient = LmStudioChatClient();
     _chatMemoryService = ChatMemoryService(
+      firestore: FirebaseFirestore.instance,
+      auth: FirebaseAuth.instance,
+    );
+    _doseLoggingService = ChatDoseLoggingService(
       firestore: FirebaseFirestore.instance,
       auth: FirebaseAuth.instance,
     );
@@ -289,6 +297,171 @@ class _ChatScreenState extends State<ChatScreen> {
     return created;
   }
 
+  Future<void> _persistAssistantMessage({
+    required String? sessionId,
+    required String userText,
+    required String response,
+  }) async {
+    if (sessionId == null) {
+      return;
+    }
+
+    try {
+      await _chatMemoryService.saveMessage(
+        sessionId: sessionId,
+        sender: 'bot',
+        content: response,
+      );
+
+      await _chatMemoryService.updateSummary(
+        sessionId: sessionId,
+        userMessage: userText,
+        assistantMessage: response,
+      );
+    } catch (error, stackTrace) {
+      _logMemoryError('saveBotMessageOrSummary', error, stackTrace);
+    }
+  }
+
+  String _formatDoseAmount(ParsedDoseAmount amount) {
+    final valueText = amount.value % 1 == 0
+        ? amount.value.toStringAsFixed(0)
+        : amount.value.toString();
+    return '$valueText ${amount.unit}';
+  }
+
+  String _buildAmbiguousMedicationPrompt(List<MedicationOption> options) {
+    final labels = options.take(3).map((option) => option.name).join(', ');
+    return 'I found multiple medications matching that name ($labels). Which one should I log this dose for?';
+  }
+
+  MedicationOption? _resolveAmbiguousMedicationReply(
+    String userText,
+    _PendingDoseAmbiguityRequest request,
+  ) {
+    final normalizedReply = userText
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (normalizedReply.isEmpty) {
+      return null;
+    }
+
+    final exact = request.options.where((option) {
+      final normalizedName = option.name
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      return normalizedName == normalizedReply;
+    }).toList();
+
+    if (exact.length == 1) {
+      return exact.first;
+    }
+
+    final contained = request.options.where((option) {
+      final normalizedName = option.name
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      return normalizedName.contains(normalizedReply) ||
+          normalizedReply.contains(normalizedName);
+    }).toList();
+
+    if (contained.length == 1) {
+      return contained.first;
+    }
+
+    return null;
+  }
+
+  Future<String?> _tryHandleDoseLoggingIntent(String userText) async {
+    final pendingAmbiguity = _pendingDoseAmbiguityRequest;
+    if (pendingAmbiguity != null) {
+      final selectedMedication =
+          _resolveAmbiguousMedicationReply(userText, pendingAmbiguity);
+      if (selectedMedication == null) {
+        return _buildAmbiguousMedicationPrompt(pendingAmbiguity.options);
+      }
+
+      final writeResult = await _doseLoggingService.logTakenDose(
+        medication: selectedMedication,
+        amount: pendingAmbiguity.amount,
+      );
+
+      _pendingDoseAmbiguityRequest = null;
+      final amountText = _formatDoseAmount(pendingAmbiguity.amount);
+      if (writeResult.linkedToPlannedDose) {
+        return 'Logged $amountText of ${selectedMedication.name} as taken and matched it to your planned dose.';
+      }
+      return 'Logged $amountText of ${selectedMedication.name} as taken for today.';
+    }
+
+    final pendingAmount = _pendingDoseAmountRequest;
+    if (pendingAmount != null) {
+      final parsedAmount = _doseLoggingService.parseDoseAmount(userText);
+      if (parsedAmount == null) {
+        return 'Please provide both amount and unit so I can log it (example: 200 mg).';
+      }
+
+      _pendingDoseAmountRequest = null;
+      final parsed = ParsedDoseIntake(
+        medicationName: pendingAmount.medicationName,
+        amount: parsedAmount,
+      );
+
+      return _logParsedDoseIntake(parsed);
+    }
+
+    final parsed = _doseLoggingService.parseDoseIntakeStatement(userText);
+    if (parsed == null) {
+      return null;
+    }
+
+    if (!parsed.hasAmount) {
+      _pendingDoseAmountRequest =
+          _PendingDoseAmountRequest(medicationName: parsed.medicationName);
+      return 'I can log that. Please specify the amount and unit for ${parsed.medicationName} (example: 200 mg).';
+    }
+
+    return _logParsedDoseIntake(parsed);
+  }
+
+  Future<String> _logParsedDoseIntake(ParsedDoseIntake parsed) async {
+    final amount = parsed.amount;
+    if (amount == null) {
+      return 'Please provide both amount and unit so I can log this dose.';
+    }
+
+    final resolved = await _doseLoggingService.resolveMedication(parsed.medicationName);
+    if (resolved.isMatched && resolved.matched != null) {
+      final writeResult = await _doseLoggingService.logTakenDose(
+        medication: resolved.matched!,
+        amount: amount,
+      );
+
+      final amountText = _formatDoseAmount(amount);
+      if (writeResult.linkedToPlannedDose) {
+        return 'Logged $amountText of ${resolved.matched!.name} as taken and matched it to your planned dose.';
+      }
+      return 'Logged $amountText of ${resolved.matched!.name} as taken for today.';
+    }
+
+    if (resolved.isAmbiguous) {
+      _pendingDoseAmbiguityRequest = _PendingDoseAmbiguityRequest(
+        amount: amount,
+        options: resolved.ambiguousOptions,
+      );
+      return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+    }
+
+    return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+  }
+
   Future<void> _handleSendMessage() async {
     if (_controller.text.trim().isEmpty) return;
     if (_isTyping) return;
@@ -305,27 +478,6 @@ class _ChatScreenState extends State<ChatScreen> {
     String response;
 
     try {
-      final endpoint = LmStudioConfig.completionUri;
-      if (endpoint == null) {
-        throw LmStudioException(
-          'LM Studio URL is missing. Run with --dart-define=LM_STUDIO_BASE_URL=http://169.254.5.254:1234',
-        );
-      }
-
-      String authorizedContext = '';
-      try {
-        authorizedContext =
-            await _contextProvider.buildAuthorizedContext(userText);
-        if (kDebugMode) {
-          debugPrint(
-            '[AuthorizedContext][length=${authorizedContext.length}] '
-            '${authorizedContext.length > 120 ? '${authorizedContext.substring(0, 120)}...' : authorizedContext}',
-          );
-        }
-      } catch (error, stackTrace) {
-        _logMemoryError('authorizedContext', error, stackTrace);
-      }
-
       String conversationContext = '';
       String? sessionId;
       try {
@@ -353,102 +505,120 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
-      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
-        if (sessionId != null) {
-          try {
-            final resolvedHits = await _chatMemoryService.getResolvedHits(sessionId);
-            for (final hit in resolvedHits) {
-              final hitAuthorizedContext =
-                  await _contextProvider.buildAuthorizedContext('$userText\n$hit');
-              if (hitAuthorizedContext.trim().isNotEmpty) {
-                authorizedContext = hitAuthorizedContext;
-                if (kDebugMode) {
-                  debugPrint('[AuthorizedContext] Resolved via stored hit: $hit');
+      final intakeResponse = await _tryHandleDoseLoggingIntent(userText);
+      if (intakeResponse != null) {
+        response = intakeResponse;
+        await _persistAssistantMessage(
+          sessionId: sessionId,
+          userText: userText,
+          response: response,
+        );
+      } else {
+        final endpoint = LmStudioConfig.completionUri;
+        if (endpoint == null) {
+          throw LmStudioException(
+            'LM Studio URL is missing. Run with --dart-define=LM_STUDIO_BASE_URL=http://169.254.5.254:1234',
+          );
+        }
+
+        String authorizedContext = '';
+        try {
+          authorizedContext =
+              await _contextProvider.buildAuthorizedContext(userText);
+          if (kDebugMode) {
+            debugPrint(
+              '[AuthorizedContext][length=${authorizedContext.length}] '
+              '${authorizedContext.length > 120 ? '${authorizedContext.substring(0, 120)}...' : authorizedContext}',
+            );
+          }
+        } catch (error, stackTrace) {
+          _logMemoryError('authorizedContext', error, stackTrace);
+        }
+
+        if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+          if (sessionId != null) {
+            try {
+              final resolvedHits = await _chatMemoryService.getResolvedHits(sessionId);
+              for (final hit in resolvedHits) {
+                final hitAuthorizedContext =
+                    await _contextProvider.buildAuthorizedContext('$userText\n$hit');
+                if (hitAuthorizedContext.trim().isNotEmpty) {
+                  authorizedContext = hitAuthorizedContext;
+                  if (kDebugMode) {
+                    debugPrint('[AuthorizedContext] Resolved via stored hit: $hit');
+                  }
+                  break;
                 }
-                break;
+              }
+            } catch (error, stackTrace) {
+              _logMemoryError('authorizedContextResolvedHits', error, stackTrace);
+            }
+          }
+        }
+
+        if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
+          try {
+            final followUpHint = _buildFollowUpHint(conversationContext);
+            final hintedAuthorizedContext = await _contextProvider
+                .buildAuthorizedContext('$userText\n$followUpHint');
+
+            if (hintedAuthorizedContext.trim().isNotEmpty) {
+              authorizedContext = hintedAuthorizedContext;
+              if (kDebugMode) {
+                debugPrint('[AuthorizedContext] Resolved via follow-up hint: $followUpHint');
               }
             }
           } catch (error, stackTrace) {
-            _logMemoryError('authorizedContextResolvedHits', error, stackTrace);
+            _logMemoryError('authorizedContextFollowUpHint', error, stackTrace);
           }
         }
 
-      }
-
-      if (authorizedContext.trim().isEmpty && conversationContext.trim().isNotEmpty) {
-        try {
-          final followUpHint = _buildFollowUpHint(conversationContext);
-          final hintedAuthorizedContext = await _contextProvider
-              .buildAuthorizedContext('$userText\n$followUpHint');
-
-          if (hintedAuthorizedContext.trim().isNotEmpty) {
-            authorizedContext = hintedAuthorizedContext;
-            if (kDebugMode) {
-              debugPrint('[AuthorizedContext] Resolved via follow-up hint: $followUpHint');
+        if (sessionId != null && authorizedContext.trim().isNotEmpty) {
+          final resolvedDrug = _extractDrugName(authorizedContext);
+          if (resolvedDrug != null && resolvedDrug.trim().isNotEmpty) {
+            try {
+              await _chatMemoryService.recordResolvedHit(sessionId, resolvedDrug);
+            } catch (error, stackTrace) {
+              _logMemoryError('recordResolvedHit', error, stackTrace);
             }
           }
-        } catch (error, stackTrace) {
-          _logMemoryError('authorizedContextFollowUpHint', error, stackTrace);
         }
-      }
 
-      if (sessionId != null && authorizedContext.trim().isNotEmpty) {
-        final resolvedDrug = _extractDrugName(authorizedContext);
-        if (resolvedDrug != null && resolvedDrug.trim().isNotEmpty) {
-          try {
-            await _chatMemoryService.recordResolvedHit(sessionId, resolvedDrug);
-          } catch (error, stackTrace) {
-            _logMemoryError('recordResolvedHit', error, stackTrace);
-          }
-        }
-      }
-
-      final trimmedAuthorizedContext = authorizedContext.trim();
-      final shouldIncludeExtraContext =
-          trimmedAuthorizedContext.length < _minAuthorizedLengthToDisableExtra;
-      final extraContextForRequest =
-          shouldIncludeExtraContext ? conversationContext : '';
-
-      response = await _chatClient.complete(
-        endpoint: endpoint,
-        model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
-        authorizedContext: authorizedContext,
-        extraContext: extraContextForRequest,
-        question: userText,
-      );
-
-      if (trimmedAuthorizedContext.isNotEmpty &&
-          response.trim() == kRefusalResponse) {
-        final retryQuestion = _buildRetryQuestion(
-          originalQuestion: userText,
-          authorizedContext: trimmedAuthorizedContext,
-        );
+        final trimmedAuthorizedContext = authorizedContext.trim();
+        final shouldIncludeExtraContext =
+            trimmedAuthorizedContext.length < _minAuthorizedLengthToDisableExtra;
+        final extraContextForRequest =
+            shouldIncludeExtraContext ? conversationContext : '';
 
         response = await _chatClient.complete(
           endpoint: endpoint,
           model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
           authorizedContext: authorizedContext,
-          extraContext: '',
-          question: retryQuestion,
+          extraContext: extraContextForRequest,
+          question: userText,
         );
-      }
 
-      if (sessionId != null) {
-        try {
-          await _chatMemoryService.saveMessage(
-            sessionId: sessionId,
-            sender: 'bot',
-            content: response,
+        if (trimmedAuthorizedContext.isNotEmpty &&
+            response.trim() == kRefusalResponse) {
+          final retryQuestion = _buildRetryQuestion(
+            originalQuestion: userText,
+            authorizedContext: trimmedAuthorizedContext,
           );
 
-          await _chatMemoryService.updateSummary(
-            sessionId: sessionId,
-            userMessage: userText,
-            assistantMessage: response,
+          response = await _chatClient.complete(
+            endpoint: endpoint,
+            model: _isDetailedMode ? LmStudioModels.detailed : LmStudioModels.quick,
+            authorizedContext: authorizedContext,
+            extraContext: '',
+            question: retryQuestion,
           );
-        } catch (error, stackTrace) {
-          _logMemoryError('saveBotMessageOrSummary', error, stackTrace);
         }
+
+        await _persistAssistantMessage(
+            sessionId: sessionId,
+          userText: userText,
+          response: response,
+        );
       }
     } on LmStudioException catch (error) {
       response =
@@ -701,4 +871,20 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+}
+
+class _PendingDoseAmountRequest {
+  const _PendingDoseAmountRequest({required this.medicationName});
+
+  final String medicationName;
+}
+
+class _PendingDoseAmbiguityRequest {
+  const _PendingDoseAmbiguityRequest({
+    required this.amount,
+    required this.options,
+  });
+
+  final ParsedDoseAmount amount;
+  final List<MedicationOption> options;
 }

@@ -13,6 +13,10 @@ class DoseLogModel extends DoseLogEntity {
     required super.escalatieVerzonden,
     super.escalatieTijd,
     required super.scheduledNotificationIds,
+    super.takenAmountValue,
+    super.takenAmountUnit,
+    super.takenAmountText,
+    super.source,
     required super.reference,
   });
 
@@ -37,6 +41,10 @@ class DoseLogModel extends DoseLogEntity {
           : null,
       scheduledNotificationIds:
           List<int>.from(data['scheduledNotificationIds'] ?? []),
+      takenAmountValue: _toDoubleOrNull(data['takenAmountValue']),
+      takenAmountUnit: (data['takenAmountUnit'] as String?)?.trim(),
+      takenAmountText: (data['takenAmountText'] as String?)?.trim(),
+      source: (data['source'] as String?)?.trim(),
       reference: doc.reference,
     );
   }
@@ -54,6 +62,10 @@ class DoseLogModel extends DoseLogEntity {
       escalatieVerzonden: entity.escalatieVerzonden,
       escalatieTijd: entity.escalatieTijd,
       scheduledNotificationIds: entity.scheduledNotificationIds,
+      takenAmountValue: entity.takenAmountValue,
+      takenAmountUnit: entity.takenAmountUnit,
+      takenAmountText: entity.takenAmountText,
+      source: entity.source,
       reference: entity.reference,
     );
   }
@@ -72,6 +84,20 @@ class DoseLogModel extends DoseLogEntity {
       'escalatieTijd':
           escalatieTijd != null ? Timestamp.fromDate(escalatieTijd!) : null,
       'scheduledNotificationIds': scheduledNotificationIds,
+      'takenAmountValue': takenAmountValue,
+      'takenAmountUnit': takenAmountUnit,
+      'takenAmountText': takenAmountText,
+      'source': source,
     };
+  }
+
+  static double? _toDoubleOrNull(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value);
+    }
+    return null;
   }
 }
