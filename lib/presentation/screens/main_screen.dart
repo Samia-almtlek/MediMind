@@ -8,6 +8,8 @@ import 'package:medimind/data/local_db/drug_loader.dart';
 import 'schedule_screen.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
+import '../../core/service/tts_service.dart';
+
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -166,6 +168,7 @@ TargetFocus _buildTarget({
 }
 
   void _onItemTapped(int index) {
+     TTSService.instance.stopIfSpeaking();
     setState(() {
       _selectedIndex = index;
     });

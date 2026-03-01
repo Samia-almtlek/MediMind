@@ -7,6 +7,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../data/repositories_impl/dose_log_repository_impl.dart';
 import '../../service/database/firestore_service.dart';
 
+import '../service/tts_service.dart';
+
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -43,39 +45,73 @@ class NotificationService {
     await _notifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (response) async {
+   
         final payload = response.payload;
         if (payload == null) return;
 
         final parts = payload.split('|');
-        if (parts.length != 4) return;
-
+        if (parts.length != 5) return;
         final stage = int.parse(parts[1]);
         final medicatieId = parts[2];
         final doseId = parts[3];
+        final medicationName = parts[4];
 
-        await _doseRepository.incrementReminderCount(
-            medicatieId, doseId);
+        await _doseRepository.incrementReminderCount(medicatieId, doseId);
+
+        // 🔊 Check if voice reminder is enabled
+        final voiceEnabled = Hive.box('notification_settings')
+            .get('voiceEnabled', defaultValue: false);
+
+final hideSensitive =
+    Hive.box('notification_settings')
+        .get('hideSensitive', defaultValue: false);
+
+        if (voiceEnabled) {
+          String ttsText;
+
+         switch (stage) {
+  case 1:
+    ttsText = hideSensitive
+        ? "It is time to take your medication."
+        : "It is time to take $medicationName.";
+    break;
+
+  case 2:
+    ttsText = hideSensitive
+        ? "Reminder. Please take your medication."
+        : "Reminder. Please take $medicationName.";
+    break;
+
+  case 3:
+    ttsText = hideSensitive
+        ? "Last reminder. Please take your medication now."
+        : "Last reminder. Please take $medicationName now.";
+    break;
+
+  default:
+    ttsText = "Medication reminder.";
+}
+
+          await Future.delayed(const Duration(milliseconds: 400));
+          await TTSService.instance.speak(ttsText);
+        }
 
         if (stage >= 3) {
           Future.delayed(const Duration(minutes: 1), () async {
-            final logs =
-                await _doseRepository.getLogsByMedication(medicatieId);
+            final logs = await _doseRepository.getLogsByMedication(medicatieId);
 
-            final dose = logs.firstWhere(
-                (element) => element.id == doseId);
+            final dose = logs.firstWhere((element) => element.id == doseId);
 
             if (dose.status == "pending") {
-              await _doseRepository.markAsMissed(
-                  medicatieId, doseId);
+              await _doseRepository.markAsMissed(medicatieId, doseId);
             }
           });
         }
       },
     );
 
-    final androidPlugin =
-        _notifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
@@ -95,9 +131,8 @@ class NotificationService {
   /// PERMISSIONS
   /// ==========================
   Future<void> _requestPermissions() async {
-    final androidPlugin =
-        _notifications.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.requestNotificationsPermission();
     await androidPlugin?.requestExactAlarmsPermission();
@@ -122,24 +157,19 @@ class NotificationService {
     required DateTime scheduledTime,
     required String medicationName,
   }) async {
-
     // 🔒 LOCK SCREEN PRIVACY
-    final hideSensitive =
-        Hive.box('notification_settings')
-            .get('hideSensitive', defaultValue: false);
+    final hideSensitive = Hive.box('notification_settings')
+        .get('hideSensitive', defaultValue: false);
 
     final safeBaseId = baseId % 1000000;
 
-    final firstTime =
-        tz.TZDateTime.from(scheduledTime, tz.local);
+    final firstTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
     final secondTime = tz.TZDateTime.from(
-        scheduledTime.add(const Duration(minutes: 5)),
-        tz.local);
+        scheduledTime.add(const Duration(minutes: 5)), tz.local);
 
     final thirdTime = tz.TZDateTime.from(
-        scheduledTime.add(const Duration(minutes: 10)),
-        tz.local);
+        scheduledTime.add(const Duration(minutes: 10)), tz.local);
 
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -168,11 +198,10 @@ class NotificationService {
       text1,
       firstTime,
       details,
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      payload: "STAGE|1|$medicatieId|$doseId",
+      payload: "STAGE|1|$medicatieId|$doseId|$medicationName",
     );
 
     await _notifications.zonedSchedule(
@@ -181,11 +210,10 @@ class NotificationService {
       text2,
       secondTime,
       details,
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      payload: "STAGE|2|$medicatieId|$doseId",
+      payload: "STAGE|2|$medicatieId|$doseId|$medicationName",
     );
 
     await _notifications.zonedSchedule(
@@ -194,11 +222,10 @@ class NotificationService {
       text3,
       thirdTime,
       details,
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
-      payload: "STAGE|3|$medicatieId|$doseId",
+      payload: "STAGE|3|$medicatieId|$doseId|$medicationName",
     );
   }
 
@@ -209,10 +236,8 @@ class NotificationService {
     required String medicationName,
     required int remainingDays,
   }) async {
-
-    final hideSensitive =
-        Hive.box('notification_settings')
-            .get('hideSensitive', defaultValue: false);
+    final hideSensitive = Hive.box('notification_settings')
+        .get('hideSensitive', defaultValue: false);
 
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -234,6 +259,4 @@ class NotificationService {
       details,
     );
   }
-
-  
 }

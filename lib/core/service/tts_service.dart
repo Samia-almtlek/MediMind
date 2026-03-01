@@ -5,7 +5,6 @@ class TTSService {
   static final TTSService instance = TTSService._();
 
   final FlutterTts _flutterTts = FlutterTts();
-
   bool _initialized = false;
 
   Future<void> init() async {
@@ -20,11 +19,14 @@ class TTSService {
 
   Future<void> speak(String text) async {
     await init();
+
+    // 🔥 Always stop before speaking
     await _flutterTts.stop();
+
     await _flutterTts.speak(text);
   }
 
-  Future<void> stop() async {
+  Future<void> stopIfSpeaking() async {
     await _flutterTts.stop();
   }
 }
