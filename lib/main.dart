@@ -1,34 +1,77 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-void main() async {
-  // Ensures that Flutter is fully initialized before using async code
+import 'firebase_options.dart';
+import 'auth/presentation/screens/register_screen.dart';
+
+import 'presentation/screens/medications_screen.dart';
+import 'presentation/screens/medical_id_screen.dart';
+import 'presentation/screens/support_screen.dart';
+import 'presentation/screens/privacy_screen.dart';
+import 'presentation/screens/notification_settings_screen.dart';
+import 'presentation/screens/splash_screen.dart';
+import 'package:medimind/core/notification/notification_service.dart';
+import 'data/local_db/drug_loader.dart';
+
+/// Entry point for the app
+
+Future<void> main() async {
+  /// Ensures that Flutter bindings are initialized
+  /// before calling any asynchronous code.
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase using platform-specific options
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  /// Initialize Hive (local key-value database)
+  /// Hive is a pure Dart solution and does not depend on
+  /// Android / iOS build tools.
+  await Hive.initFlutter();
 
-  // Start the Flutter application
-  runApp(const MyApp());
+  /// Open a Hive box to store medication names locally.
+  /// We only store Strings (drug names) for autocomplete.
+  await Hive.openBox<String>('drugs');
+  await DrugLoader.loadDrugsIfNeeded();
+
+  // Search the main() function and add the box
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Add the following: the box for medical ID (we use a dynamic box for different types)
+  await Hive.openBox('medical_id_data');
+  // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
+  await Hive.openBox('medication_stock');
+  await Hive.openBox('notification_settings'); // 🔒 NEW
+  final settingsBox = Hive.box('notification_settings');
+
+// Create default voice setting (only first launch)
+  if (!settingsBox.containsKey('voiceEnabled')) {
+    await settingsBox.put('voiceEnabled', false);
+  }
+
+  print('🗄️ Hive initialized successfully');
+  await NotificationService.instance.init();
+
+  runApp(const MediMindApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Root widget of the application
+class MediMindApp extends StatelessWidget {
+  const MediMindApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      // Removes the "DEBUG" banner from the top-right corner
+    return MaterialApp(
+      /// Hide the debug banner
       debugShowCheckedModeBanner: false,
 
-      // Application title
-      title: 'MediMind',
-
-      // Temporary screen (we will replace this with AuthGate next)
-      home: Placeholder(),
+      // Set SplashScreen as the initial screen
+      home: const SplashScreen(),
+      routes: {
+        '/signup': (context) => const RegisterScreen(),
+        '/medications': (context) => const MedicationsScreen(),
+        '/medical_id': (context) => const MedicalIdScreen(),
+        '/support': (context) => const SupportScreen(),
+        '/privacy': (context) => const PrivacyScreen(),
+        '/notifications': (context) => const NotificationSettingsScreen(),
+      },
     );
   }
 }
