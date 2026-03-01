@@ -5,9 +5,24 @@ import 'package:intl/intl.dart';
 
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
+import '../../core/service/tts_service.dart';
 
-class ScheduleScreen extends StatelessWidget {
+class ScheduleScreen extends StatefulWidget {
+  const ScheduleScreen({super.key});
+
   @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  List<UserMedicationModel> _currentMeds = []; 
+   @override
+  void dispose() {
+    TTSService.instance.stopIfSpeaking();
+    super.dispose();
+  }
+
+   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -25,6 +40,10 @@ class ScheduleScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
             onPressed: () {
+              if (_currentMeds.isEmpty) {
+  TTSService.instance.speak("Loading medications, please wait.");
+  return;
+}
   final activeMeds = _currentMeds.where((med) {
     final today = DateTime(
       DateTime.now().year,
@@ -81,11 +100,13 @@ class ScheduleScreen extends StatelessWidget {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState();
                 }
-                _currentMeds = snapshot.data!.docs
-                    .map((doc) => UserMedicationModel.fromFirestore(doc))
-                    .toList();
+ final meds = snapshot.data!.docs
+    .map((doc) => UserMedicationModel.fromFirestore(doc))
+    .toList();
 
-                return _buildGroupedTreatmentList(_currentMeds, context);
+_currentMeds = meds; 
+
+return _buildGroupedTreatmentList(meds, context);
               },
             ),
     );
