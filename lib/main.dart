@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'auth/presentation/auth_gate.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -11,6 +10,7 @@ import 'presentation/screens/medical_id_screen.dart';
 import 'presentation/screens/support_screen.dart';
 import 'presentation/screens/privacy_screen.dart';
 import 'presentation/screens/notification_settings_screen.dart';
+import 'presentation/screens/splash_screen.dart';
 import 'package:medimind/core/notification/notification_service.dart';
 import 'data/local_db/drug_loader.dart';
 
@@ -63,7 +63,7 @@ class MediMindApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // Set SplashScreen as the initial screen
-      home: const AuthGate(),
+      home: const SplashScreen(),
       routes: {
         '/signup': (context) => const RegisterScreen(),
         '/medications': (context) => const MedicationsScreen(),
