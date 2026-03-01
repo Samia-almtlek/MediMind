@@ -5,26 +5,8 @@ import 'package:intl/intl.dart';
 
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
-import '../../domain/models/medication.dart';
-import '../../core/widgets/speaker_button.dart';
-import '../../core/service/tts_service.dart';
 
-class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key});
-
-  @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
-}
-
-class _ScheduleScreenState extends State<ScheduleScreen> {
-  List<UserMedicationModel> _currentMeds = [];
-
-  @override
-  void dispose() {
-    TTSService.instance.stopIfSpeaking();
-    super.dispose();
-  }
-
+class ScheduleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
@@ -236,11 +218,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
                 SizedBox(height: 6),
 
-                /// 🔥 REFILL BUTTON
-                ElevatedButton(
-                  onPressed: () => _showRefillDialog(context, med),
-                  child: Text("Refill"),
-                ),
+                
               ],
             ),
           ),
@@ -251,6 +229,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// 🔥 REFILL DIALOG
+  // ignore: unused_element
   void _showRefillDialog(BuildContext context, UserMedicationModel med) {
     final controller = TextEditingController();
 

@@ -3,7 +3,6 @@ import '../../service/database/firestore_service.dart';
 import '../../domain/entities/caregiver_entity.dart';
 import '../../domain/repositories/caregiver_repository.dart';
 import '../models/caregiver_model.dart';
-import '../../data/models/caregiver_model.dart';
 
 
 class CaregiverRepositoryImpl implements CaregiverRepository {

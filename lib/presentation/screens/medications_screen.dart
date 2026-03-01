@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
-import '../../core/service/tts_service.dart';
-import '../../core/widgets/speaker_button.dart';
+import '../../data/models/user_medication_model.dart';
+
 class MedicationsScreen extends StatefulWidget {
   const MedicationsScreen({super.key});
 
@@ -12,56 +12,252 @@ class MedicationsScreen extends StatefulWidget {
 }
 
 class _MedicationsScreenState extends State<MedicationsScreen> {
-  late Box medicationBox;
-  List<Map<String, dynamic>> _myMedications = [];
-
-  // Controllers for the add medication form
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _dosageController = TextEditingController();
-  final TextEditingController _stockController = TextEditingController();
-  final TextEditingController _maxController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    medicationBox = Hive.box('medication_stock');
-    _loadMedications();
+  Widget build(BuildContext context) {
+    final String? uid = FirebaseAuth.instance.currentUser?.uid;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
+      appBar: AppBar(
+        title: const Text(
+          "My Cabinet",
+          style: TextStyle(
+              color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios,
+              color: Colors.black, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: uid == null
+          ? _buildEmptyState()
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('user_medications')
+                  .where('userId', isEqualTo: uid)
+                  .where('isActive', isEqualTo: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                final meds = snapshot.data!.docs
+                    .map((doc) =>
+                        UserMedicationModel.fromFirestore(doc))
+                    .toList();
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: meds.length,
+                  itemBuilder: (context, index) {
+                    return _buildMedicineCard(meds[index]);
+                  },
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddStockSheet(context),
+        backgroundColor: AppColors.primaryBlue,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text("Add Stock",
+            style: TextStyle(color: Colors.white)),
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-      TTSService.instance.stopIfSpeaking();
-    _nameController.dispose();
-    _dosageController.dispose();
-    _stockController.dispose();
-    _maxController.dispose();
-    super.dispose();
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined,
+              size: 80,
+              color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text("Your cabinet is empty",
+              style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          Text("Add medication from Treatment Plan",
+              style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 13)),
+        ],
+      ),
+    );
   }
 
-  // Loading the meds from Hive and update the state
-  void _loadMedications() {
-    final rawData = medicationBox.get('items', defaultValue: []);
-    setState(() {
-      _myMedications = List<Map<String, dynamic>>.from(
-        rawData.map((item) => Map<String, dynamic>.from(item)),
-      );
-    });
+  Widget _buildMedicineCard(UserMedicationModel med) {
+
+    final int currentStock = med.currentStock;
+    final int maxStock =
+        med.initialStock == 0 ? 1 : med.initialStock;
+
+    final double progress =
+        (currentStock / maxStock).clamp(0.0, 1.0);
+
+    final bool isLowStock =
+        currentStock <= med.lowStockThresholdDays;
+
+    Color statusColor = progress < 0.2
+        ? Colors.redAccent
+        : (progress < 0.5
+            ? Colors.orangeAccent
+            : AppColors.primaryBlue);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        children: [
+
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius:
+                        BorderRadius.circular(12)),
+                child: Icon(Icons.medication,
+                    color: statusColor),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(med.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16)),
+                      Text(med.dosage,
+                          style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12)),
+                    ]),
+              ),
+              Text("$currentStock/${med.initialStock}",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: statusColor)),
+            ],
+          ),
+
+          const SizedBox(height: 15),
+
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 6,
+              backgroundColor: Colors.grey[100],
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(
+                      statusColor),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          if (isLowStock)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                "Low stock — please refill",
+                style: TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 12),
+              ),
+            ),
+
+          
+        ],
+      ),
+    );
   }
 
-  // Save the list on Hive
-  void _saveToHive() {
-    medicationBox.put('items', _myMedications);
+  // ignore: unused_element
+  void _showRefillDialog(
+      BuildContext context, UserMedicationModel med) {
+
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Refill Medication"),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration:
+              const InputDecoration(labelText: "Enter quantity"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+
+              final int? amount =
+                  int.tryParse(controller.text);
+
+              if (amount == null || amount <= 0)
+                return;
+
+              await FirebaseFirestore.instance
+                  .collection('user_medications')
+                  .doc(med.id)
+                  .update({
+                'currentStock': FieldValue.increment(amount),
+                'initialStock': FieldValue.increment(amount),
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _removeMedicationAt(int index) {
-    setState(() {
-      _myMedications.removeAt(index);
-      _saveToHive();
-    });
-  }
+  void _showAddStockSheet(BuildContext context) {
 
-  void _showAddMedicationSheet() {
-    String? errorMessage;
+    final String? uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    String? selectedMedicationId;
+    UserMedicationModel? selectedMedication;
+    final TextEditingController quantityController =
+        TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -77,282 +273,151 @@ class _MedicationsScreenState extends State<MedicationsScreen> {
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  "Add Medication Stock",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                if (errorMessage != null) _buildErrorBadge(errorMessage!),
-                _buildTextField(_nameController, "Medication Name", Icons.medication),
-                _buildTextField(
-                  _dosageController,
-                  "Dosage (e.g. 500mg)",
-                  Icons.monitor_weight_outlined,
-                ),
-                Row(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('user_medications')
+                  .where('userId', isEqualTo: uid)
+                  .where('isActive', isEqualTo: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+
+                if (!snapshot.hasData) {
+                  return const Center(
+                      child: CircularProgressIndicator());
+                }
+
+                final meds = snapshot.data!.docs
+                    .map((doc) =>
+                        UserMedicationModel.fromFirestore(doc))
+                    .toList();
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: _buildTextField(
-                        _stockController,
-                        "Current Stock",
-                        Icons.inventory_2_outlined,
-                        isNumber: true,
+
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius:
+                            BorderRadius.circular(10),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildTextField(
-                        _maxController,
-                        "Total in Pack",
-                        Icons.format_list_numbered,
-                        isNumber: true,
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      "Add Medication Stock",
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: "Select Medication",
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(15),
+                        ),
+                      ),
+                      value: selectedMedicationId,
+                      items: meds.map((med) {
+                        return DropdownMenuItem(
+                          value: med.id,
+                          child: Text(
+                              "${med.name} (${med.dosage})"),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setModalState(() {
+                          selectedMedicationId = value;
+                          selectedMedication =
+                              meds.firstWhere(
+                                  (element) =>
+                                      element.id ==
+                                      value);
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    TextField(
+                      controller: quantityController,
+                      keyboardType:
+                          TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Quantity to add",
+                        border: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(15),
+                        ),
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            AppColors.primaryBlue,
+                        minimumSize:
+                            const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(15),
+                        ),
+                      ),
+                      onPressed: () async {
+
+                        final int? amount =
+                            int.tryParse(
+                                quantityController.text);
+
+                        if (selectedMedication ==
+                                null ||
+                            amount == null ||
+                            amount <= 0) {
+                          return;
+                        }
+
+                        await FirebaseFirestore.instance
+                            .collection(
+                                'user_medications')
+                            .doc(selectedMedication!.id)
+                            .update({
+                          'currentStock':
+                              FieldValue.increment(amount),
+                          'initialStock':
+                              FieldValue.increment(amount),
+                        });
+
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Add to Cabinet",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight:
+                                FontWeight.bold),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
                   ],
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  onPressed: () {
-                    if (_nameController.text.trim().isEmpty) {
-                      setModalState(
-                        () => errorMessage = "Medication name is required",
-                      );
-                      return;
-                    }
-                    if (_stockController.text.trim().isEmpty) {
-                      setModalState(
-                        () => errorMessage = "Current stock is required",
-                      );
-                      return;
-                    }
-                    if (_maxController.text.trim().isEmpty) {
-                      setModalState(
-                        () => errorMessage = "Total in pack is required",
-                      );
-                      return;
-                    }
-
-                    setState(() {
-                      _myMedications.add({
-                        "name": _nameController.text.trim(),
-                        "dosage": _dosageController.text.trim(),
-                        "currentStock": int.tryParse(_stockController.text) ?? 0,
-                        "maxStock": int.tryParse(_maxController.text) ?? 1,
-                      });
-                      _saveToHive();
-                    });
-
-                    _nameController.clear();
-                    _dosageController.clear();
-                    _stockController.clear();
-                    _maxController.clear();
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    "Add to Cabinet",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorBadge(String message) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 15),
-      decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    bool isNumber = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: TextField(
-        controller: controller,
-        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.primaryBlue),
-          labelText: label,
-          filled: true,
-          fillColor: Colors.grey[50]?.withOpacity(0.5) ?? Colors.grey.withOpacity(0.1),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(
-        title: const Text("My Cabinet", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20), onPressed: () => Navigator.pop(context)),
-      ),
-      body: _myMedications.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _myMedications.length,
-              itemBuilder: (context, index) {
-                return Dismissible(
-                  key: Key('${_myMedications[index]['name']}_$index'),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  onDismissed: (_) => _removeMedicationAt(index),
-                  child: _buildMedicineCard(_myMedications[index], index),
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddMedicationSheet,
-        backgroundColor: AppColors.primaryBlue,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text("Add Stock", style: TextStyle(color: Colors.white)),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text("Your cabinet is empty", style: TextStyle(color: Colors.grey[500], fontSize: 16, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text("Add your medication to track stock", style: TextStyle(color: Colors.grey[400], fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMedicineCard(Map<String, dynamic> med, int index) {
-    final int currentStock = (med['currentStock'] as int?) ?? 0;
-    final int maxStock = ((med['maxStock'] as int?) ?? 1).clamp(1, 999999);
-    final double progress = (currentStock / maxStock).clamp(0.0, 1.0);
-    Color statusColor = progress < 0.2 ? Colors.redAccent : (progress < 0.5 ? Colors.orangeAccent : AppColors.primaryBlue);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.medication, color: statusColor)),
-              const SizedBox(width: 15),
-             Expanded(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              med['name'],
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
           ),
-          SpeakerButton(
-            text:
-                "Medication ${med['name']}, dosage ${med['dosage']}. You have ${med['currentStock']} out of ${med['maxStock']} remaining.",
-            size: 18,
-            color: Colors.grey[600],
-          ),
-        ],
-      ),
-      Text(
-        med['dosage'],
-        style: TextStyle(
-          color: Colors.grey[500],
-          fontSize: 12,
         ),
-      ),
-    ],
-  ),
-),
-              Text("${med['currentStock']}/${med['maxStock']}", style: TextStyle(fontWeight: FontWeight.bold, color: statusColor)),
-            ],
-          ),
-          const SizedBox(height: 15),
-          ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.grey[100], valueColor: AlwaysStoppedAnimation<Color>(statusColor))),
-        ],
       ),
     );
   }

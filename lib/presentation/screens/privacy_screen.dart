@@ -70,7 +70,7 @@ for (var doc in doseSnapshot.docs) {
         );
         await user.reauthenticateWithCredential(credential);
         await _deleteEverything(context);
-      } on FirebaseAuthException catch (e) {
+      } on FirebaseAuthException {
         String errorMessage = "Incorrect password.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
