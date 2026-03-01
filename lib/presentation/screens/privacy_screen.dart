@@ -7,6 +7,8 @@ import 'package:medimind/auth/presentation/screens/login_screen.dart';
 import '../../core/widgets/speaker_button.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/service/tts_service.dart';
+import '../../service/pdf_service.dart';
+import '../../domain/models/medication.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -168,35 +170,65 @@ for (var doc in doseSnapshot.docs) {
     );
   }
 
-  void _exportData(BuildContext context) {
-    final box = Hive.box('medical_id_data');
-    final bloodType = box.get('bloodType', defaultValue: 'Not set');
-    final allergies = box.get('allergies', defaultValue: []);
+  Future<List<Medication>> _loadUserMedicationsForReport(String uid) async {
+    final snapshotByUser = await FirebaseFirestore.instance
+        .collection('user_medications')
+        .where('userId', isEqualTo: uid)
+        .get();
 
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.mark_email_read_outlined,
-                size: 50, color: AppColors.primaryBlue),
-            const SizedBox(height: 15),
-            const Text("Exporting Data",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 10),
-            Text(
-                "A summary of your Medical ID ($bloodType, ${allergies.length} allergies) is being sent to your mailbox."),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
-            ),
-          ],
+    final snapshotLegacyNoUserId = await FirebaseFirestore.instance
+        .collection('user_medications')
+        .where('userId', isNull: true)
+        .get();
+
+    final mergedDocsById =
+        <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    for (final doc in snapshotByUser.docs) {
+      mergedDocsById[doc.id] = doc;
+    }
+    for (final doc in snapshotLegacyNoUserId.docs) {
+      mergedDocsById[doc.id] = doc;
+    }
+
+    return mergedDocsById.values
+        .map((doc) => Medication.fromFirestore(doc))
+        .toList();
+  }
+
+  Future<void> _exportData(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to export your report.'),
+          backgroundColor: Colors.redAccent,
         ),
-      ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final meds = await _loadUserMedicationsForReport(user.uid);
+      await PdfService.generateHealthReport(meds);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
   }
 
   @override
@@ -231,7 +263,7 @@ for (var doc in doseSnapshot.docs) {
             "Right of Access",
             "Download a copy of your medical data",
             Icons.download_outlined,
-            onTap: () => _exportData(context),
+            onTap: () async => _exportData(context),
           ),
           _buildPrivacyTile(
             "Data Processing",
