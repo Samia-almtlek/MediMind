@@ -3,8 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/app_colors.dart';
 import '../../auth/service/auth_service.dart';
-import '../../domain/entities/caregiver_entity.dart';
-
+import '../../core/service/tts_service.dart';
 class MedicalIdScreen extends StatefulWidget {
   const MedicalIdScreen({super.key});
 
@@ -106,6 +105,47 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
     }
   }
 
+  String _buildMedicalSummary() {
+  final buffer = StringBuffer();
+
+  buffer.writeln("Here is your medical identification information.");
+
+  if (selectedBloodType != null) {
+    buffer.writeln("Blood type is $selectedBloodType.");
+  } else {
+    buffer.writeln("Blood type is not specified.");
+  }
+
+  if (allergies.isNotEmpty) {
+    buffer.writeln("Allergies include:");
+    for (var allergy in allergies) {
+      buffer.writeln(allergy);
+    }
+  } else {
+    buffer.writeln("No allergies listed.");
+  }
+
+  if (_caregiverNameController.text.isNotEmpty) {
+    buffer.writeln(
+        "Emergency contact is ${_caregiverNameController.text}, relation ${_caregiverRelationController.text}.");
+  } else {
+    buffer.writeln("No emergency contact specified.");
+  }
+
+  return buffer.toString();
+}
+@override
+void dispose() {
+  TTSService.instance.stopIfSpeaking();
+
+  _allergyController.dispose();
+  _caregiverNameController.dispose();
+  _caregiverEmailController.dispose();
+  _caregiverRelationController.dispose();
+
+  super.dispose();
+}
+
   /// 2. Save Data to Firestore Sub-collection and Main Doc
   Future<void> _saveData() async {
     final user = _authService.currentUser;
@@ -175,6 +215,15 @@ class _MedicalIdScreenState extends State<MedicalIdScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+    icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
+    onPressed: () {
+      final text = _buildMedicalSummary();
+      if (text.trim().isNotEmpty) {
+        TTSService.instance.speak(text);
+      }
+    },
+  ),
           if (isLoading)
             const Center(
                 child: Padding(

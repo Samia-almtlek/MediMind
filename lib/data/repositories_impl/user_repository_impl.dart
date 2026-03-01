@@ -11,14 +11,21 @@ class UserRepositoryImpl implements UserRepository {
 
   @override
   Future<UserEntity?> getUserById(String userId) async {
-    final doc = await _firestoreService.users
-        .doc(userId)
-        .get() as DocumentSnapshot<Map<String, dynamic>>;
+    final doc = await _firestoreService.users.doc(userId).get();
 
     if (!doc.exists) return null;
+    final data = doc.data();
+    if (data == null) return null;
 
-    return UserModel.fromFirestore(
-        doc as QueryDocumentSnapshot<Map<String, dynamic>>);
+    return UserModel(
+      id: doc.id,
+      email: data['email'] ?? '',
+      name: data['name'] ?? '',
+      profilePhotoUrl: data['profilePhotoUrl'],
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      lastLogin: (data['lastLogin'] as Timestamp?)?.toDate(),
+      notificationsEnabled: data['notificationsEnabled'] ?? false,
+    );
   }
 
   @override

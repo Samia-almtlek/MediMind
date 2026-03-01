@@ -13,14 +13,13 @@ import 'presentation/screens/privacy_screen.dart';
 import 'presentation/screens/notification_settings_screen.dart';
 import 'package:medimind/core/notification/notification_service.dart';
 import 'data/local_db/drug_loader.dart';
+
 /// Entry point for the app
 
 Future<void> main() async {
   /// Ensures that Flutter bindings are initialized
   /// before calling any asynchronous code.
   WidgetsFlutterBinding.ensureInitialized();
-
-
 
   /// Initialize Hive (local key-value database)
   /// Hive is a pure Dart solution and does not depend on
@@ -40,10 +39,16 @@ Future<void> main() async {
   // Add the following: the box for medication stock (we use a Map to store drug name and quantity)
   await Hive.openBox('medication_stock');
   await Hive.openBox('notification_settings'); // 🔒 NEW
+  final settingsBox = Hive.box('notification_settings');
+
+// Create default voice setting (only first launch)
+  if (!settingsBox.containsKey('voiceEnabled')) {
+    await settingsBox.put('voiceEnabled', false);
+  }
 
   print('🗄️ Hive initialized successfully');
   await NotificationService.instance.init();
-  
+
   runApp(const MediMindApp());
 }
 

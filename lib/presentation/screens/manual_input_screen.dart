@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
+import '../../domain/models/medication.dart';
 import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 
 class ManualInputScreen extends StatefulWidget {
+  final Medication? medicationToEdit;
+
+  const ManualInputScreen({super.key, this.medicationToEdit});
+
   @override
   _ManualInputScreenState createState() => _ManualInputScreenState();
 }
@@ -15,6 +20,31 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   final TextEditingController notesController = TextEditingController();
 
   List<String> suggestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.medicationToEdit != null) {
+      final med = widget.medicationToEdit!;
+      nameController.text = med.name;
+      dosageController.text = med.dosage;
+
+      final raw = med.instructions;
+      if (raw.contains('Notes:')) {
+        notesController.text = raw.split('Notes:').last.trim();
+      } else {
+        notesController.text = raw.trim();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    dosageController.dispose();
+    notesController.dispose();
+    super.dispose();
+  }
 
   /// 🔍 Autocomplete search from LOCAL Hive DB
   void searchDrugs(String query) {
@@ -41,9 +71,10 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.backgroundWhite,
       appBar: AppBar(
-        title: const Text(
-          "Manual Input",
+        title: Text(
+          widget.medicationToEdit != null ? "Edit Medication" : "Manual Input",
           style: TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
@@ -136,6 +167,7 @@ class _ManualInputScreenState extends State<ManualInputScreen> {
                         notes: notesController.text.isNotEmpty
                             ? notesController.text
                             : null,
+                        medicationToEdit: widget.medicationToEdit,
                       ),
                     ),
                   );
