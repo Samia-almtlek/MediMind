@@ -72,15 +72,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      if (newPassword.isNotEmpty && user?.email != null) {
-        final credential = EmailAuthProvider.credential(
-          email: user!.email!,
-          password: currentPassword,
-        );
-        await user?.reauthenticateWithCredential(credential);
-        await user?.updatePassword(newPassword);
-      }
+   if (newPassword.isNotEmpty) {
 
+  if (user!.providerData.any((p) => p.providerId == 'google.com')) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Password is managed by Google.'),
+      ),
+    );
+    if (user!.providerData.any((p) => p.providerId == 'google.com')) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Password is managed by Google.'),
+    ),
+  );
+  return; 
+}
+  } else if (user?.email != null) {
+
+    if (newPassword.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password must be at least 6 characters.'),
+        ),
+      );
+      return;
+    }
+
+    if (newPassword == currentPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('New password must be different from current password.'),
+        ),
+      );
+      return;
+    }
+
+    final credential = EmailAuthProvider.credential(
+      email: user!.email!,
+      password: currentPassword,
+    );
+
+    await user!.reauthenticateWithCredential(credential);
+await user!.updatePassword(newPassword);  }
+}
+     
       if (_imageFile != null) {
         await user?.updatePhotoURL(_imageFile!.path);
       }
