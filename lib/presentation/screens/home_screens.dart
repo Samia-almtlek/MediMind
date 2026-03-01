@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medimind/service/pdf_service.dart';
 import 'manual_input_screen.dart';
+import 'package:medimind/core/service/tts_service.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -847,6 +848,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+
+              IconButton(
+  icon: const Icon(Icons.volume_up,
+      color: AppColors.primaryBlue),
+  onPressed: () {
+    final text =
+        "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}.";
+    TTSService.instance.speak(text);
+  },
+),
               // Checkbox from prototype
               Transform.scale(
                 scale: 1.2,
