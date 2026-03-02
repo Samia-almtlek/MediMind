@@ -92,4 +92,5 @@ This dual strategy reduces empty-report issues when historical logging is partia
 ## 9. Future improvements
 - Add explicit file save/share destination (instead of preview-only flow).
 - Add graph legends and trend indicators for adherence sections.
+- Sending the PDF into  the user's mailbox.
 - Extract report sections into smaller builder classes for easier testing.
