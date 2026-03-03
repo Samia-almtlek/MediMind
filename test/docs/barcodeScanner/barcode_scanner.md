@@ -65,8 +65,6 @@ The scan process in `ScanBarcodeScreen` follows this flow:
 
 ## 8. Technical Constraints & Security
 > [!IMPORTANT]
-> **Authentication:** The `currentUserId` is currently hardcoded for development. This **MUST** be updated to use `FirebaseAuth.instance.currentUser!.uid` once the Auth module is merged.
-
 - **Torch Control:** Managed via `MobileScannerController.toggleTorch()`.
 - **Memory Management:** The controller must be disposed of in the `dispose()` method to avoid camera memory leaks.
 
