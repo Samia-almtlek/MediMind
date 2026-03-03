@@ -10,6 +10,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medimind/service/pdf_service.dart';
 import 'manual_input_screen.dart';
 import 'package:medimind/core/service/tts_service.dart';
+import '../../domain/entities/dose_log_entity.dart';
+import '../../data/models/dose_log_model.dart';
+import '../../data/repositories_impl/dose_log_repository_impl.dart';
+import '../../service/database/firestore_service.dart';
 
 // Home screen displaying today's medication schedule
 class HomeScreen extends StatefulWidget {
@@ -23,7 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime selectedDate = DateTime.now(); // day the user is viewing
   DateTime today = DateTime.now();
   //dit is nu een lege lijst om later te vullen via de API of db
-  List<Medication> activeMeds = [];
+  
+  List<DoseLogEntity> allDoses = [];
+StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _doseSubscription;
   List<TargetFocus> targets = [];
   final GlobalKey keyMenu = GlobalKey();
   final GlobalKey keyCalendar = GlobalKey();
@@ -56,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadInitialData();
+    _loadDoseStream(); 
 
     Future.delayed(const Duration(milliseconds: 500), () {
       _checkFirstTime();
@@ -117,12 +124,43 @@ class _HomeScreenState extends State<HomeScreen> {
     return ['Time not set'];
   }
 
-  @override
-  void dispose() {
-    _medicationsSubscription?.cancel();
-    _scrollController.dispose();
-    super.dispose();
-  }
+ @override
+void dispose() {
+  _medicationsSubscription?.cancel();
+  _doseSubscription?.cancel(); 
+  _scrollController.dispose();
+  super.dispose();
+}
+
+void _loadDoseStream() async {
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  if (uid == null) return;
+
+  final medsSnapshot = await FirebaseFirestore.instance
+      .collection('user_medications')
+      .where('userId', isEqualTo: uid)
+      .get();
+
+  final medIds = medsSnapshot.docs.map((doc) => doc.id).toList();
+
+  if (medIds.isEmpty) return;
+
+  _doseSubscription = FirebaseFirestore.instance
+      .collectionGroup('dose_logs')
+      .where('userId', isEqualTo: uid)
+      .snapshots()
+      .listen((snapshot) {
+
+    if (!mounted) return;
+
+    setState(() {
+      allDoses = snapshot.docs
+          .map((doc) => DoseLogModel.fromFirestore(doc))
+          .where((dose) => medIds.contains(dose.medicatieId))
+          .toList();
+    });
+  });
+}
 
   Future<void> _checkFirstTime() async {
     final prefs = await SharedPreferences.getInstance();
@@ -258,57 +296,41 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Filters medications for the selected date,wil eck if medication's start/end date matches selectedDate
-  // For now: Returns empty list to show "No medication" view
-  List<Medication> _getListForSelectedDate() {
-    List<Medication> filteredMeds = [];
 
-    for (var med in userAddedMeds) {
-      // 1. Date Check
-      DateTime start =
-          DateTime(med.startDate.year, med.startDate.month, med.startDate.day);
-      DateTime end =
-          DateTime(med.endDate.year, med.endDate.month, med.endDate.day);
-      DateTime current =
-          DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
 
-      if (!current.isBefore(start) && !current.isAfter(end)) {
-        final allTimes = _extractTimesForMedication(med);
+ Future<void> _deleteMedication(Medication med) async {
+  if (med.id.isEmpty) return;
 
-        for (String individualTime in allTimes) {
-          // Create a temporary copy for the UI to display each time separately
-          filteredMeds.add(
-            Medication(
-              id: med.id,
-              name: med.name,
-              dosage: med.dosage,
-              time: individualTime, // Now "8:00 AM", then "4:00 PM", etc.
-              completedDates: med.completedDates,
-              startDate: med.startDate,
-              endDate: med.endDate,
-              instructions: med.instructions,
-              frequency: med.frequency,
-            ),
-          );
-        }
-      }
-    }
-    return filteredMeds;
+  final medRef = FirebaseFirestore.instance
+      .collection('user_medications')
+      .doc(med.id);
+
+  final doseLogsSnapshot =
+      await medRef.collection('dose_logs').get();
+
+  for (final doc in doseLogsSnapshot.docs) {
+    await doc.reference.delete();
   }
 
-  Future<void> _deleteMedication(Medication med) async {
-    if (med.id.isEmpty) return;
+  await medRef.delete();
+}
+List<DoseLogEntity> _getDosesForSelectedDate() {
+  final normalizedSelected =
+      DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
 
-    await FirebaseFirestore.instance
-        .collection('user_medications')
-        .doc(med.id)
-        .delete();
+  return allDoses
+      .where((dose) {
+        final normalizedDose =
+            DateTime(dose.geplandeTijd.year,
+                dose.geplandeTijd.month,
+                dose.geplandeTijd.day);
 
-    setState(() {
-      userAddedMeds.removeWhere((item) => item.id == med.id);
-    });
-  }
-
+        return normalizedDose == normalizedSelected;
+      })
+      .toList()
+    ..sort((a, b) =>
+        a.geplandeTijd.compareTo(b.geplandeTijd));
+}
   Future<List<Medication>> _loadUserMedicationsForReport(String uid) async {
     final snapshotByUser = await FirebaseFirestore.instance
         .collection('user_medications')
@@ -494,36 +516,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateTime(date.year, date.month, date.day);
   }
 
-  Future<void> _toggleMedicationCompletion(Medication med, bool isChecked) async {
-    if (med.id.isEmpty) return;
 
-    final targetDate = _normalizeDate(selectedDate);
-    final updatedDates = List<DateTime>.from(med.completedDates);
-
-    if (isChecked) {
-      if (!updatedDates.any((d) => DateUtils.isSameDay(d, targetDate))) {
-        updatedDates.add(targetDate);
-      }
-    } else {
-      updatedDates.removeWhere((d) => DateUtils.isSameDay(d, targetDate));
-    }
-
-    setState(() {
-      final sourceIndex = userAddedMeds.indexWhere((item) => item.id == med.id);
-      if (sourceIndex != -1) {
-        userAddedMeds[sourceIndex].completedDates
-          ..clear()
-          ..addAll(updatedDates);
-      }
-    });
-
-    await FirebaseFirestore.instance
-        .collection('user_medications')
-        .doc(med.id)
-        .update({
-      'completedDates': updatedDates.map((d) => Timestamp.fromDate(_normalizeDate(d))).toList(),
-    });
-  }
 
   void _showMoreActions() {
     showModalBottomSheet(
@@ -716,28 +709,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          //  Lijst (of Empty State)
           Expanded(
-            child: _getListForSelectedDate().isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_outlined,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          "No medication scheduled for this day.",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
-                : _buildMedicationList(_getListForSelectedDate()),
+  child: _getDosesForSelectedDate().isEmpty
+      ? const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.calendar_today_outlined,
+                  size: 50, color: Colors.grey),
+              SizedBox(height: 10),
+              Text(
+                "No medication scheduled for this day.",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
           ),
+        )
+      : _buildDoseList(_getDosesForSelectedDate()),
+),
         ],
       ),
     );
@@ -807,79 +796,113 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Builds the list of medications for the day
-  Widget _buildMedicationList(List<Medication> meds) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: meds.length,
-      itemBuilder: (context, index) {
-        final med = meds[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.lightTeal.withOpacity(0.4),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Row(
-            children: [
-              // Time on the left side
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(med.time,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryBlue)),
-                  const Text("Scheduled",
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
-              const SizedBox(width: 20),
-              // Medication name and dosage
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(med.name,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(med.dosage, style: const TextStyle(color: Colors.black54)),
-                  ],
-                ),
-              ),
+  Widget _buildDoseList(List<DoseLogEntity> doses) {
+  return ListView.builder(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    itemCount: doses.length,
+    itemBuilder: (context, index) {
+      final dose = doses[index];
 
-              IconButton(
-  icon: const Icon(Icons.volume_up,
-      color: AppColors.primaryBlue),
-  onPressed: () {
-    final text =
-        "${med.name}, dosage ${med.dosage}, scheduled at ${med.time}.";
-    TTSService.instance.speak(text);
-  },
-),
-              // Checkbox from prototype
-              Transform.scale(
-                scale: 1.2,
-                child: Checkbox(
-                  key: index == 0 ? keyCheckmark : null,
-                  //check if the current date (at midnight) is in the completedDates list for this medication
-                  value: med.completedDates
-                      .any((d) => DateUtils.isSameDay(d, selectedDate)),
-                  activeColor: AppColors.primaryBlue,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5)),
-                  onChanged: (bool? value) async {
-                    await _toggleMedicationCompletion(med, value ?? false);
-                  },
-                ),
+      String formattedTime =
+          "${dose.geplandeTijd.hour.toString().padLeft(2, '0')}:"
+          "${dose.geplandeTijd.minute.toString().padLeft(2, '0')}";
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.lightTeal.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(formattedTime,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryBlue)),
+                const Text("Scheduled",
+                    style:
+                        TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+            const SizedBox(width: 20),
+
+            Expanded(
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('user_medications')
+                    .doc(dose.medicatieId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData ||
+                      !snapshot.data!.exists) {
+                    return const Text("Deleted medication");
+                  }
+
+                  final data =
+                      snapshot.data!.data()
+                          as Map<String, dynamic>;
+
+                  return Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(data['name'] ?? "",
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight:
+                                  FontWeight.bold)),
+                      Text(data['dosage'] ?? ""),
+                    ],
+                  );
+                },
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+
+            IconButton(
+              icon: const Icon(Icons.volume_up,
+                  color: AppColors.primaryBlue),
+              onPressed: () {
+                final text =
+                    "Medication scheduled at $formattedTime.";
+                TTSService.instance.speak(text);
+              },
+            ),
+
+            Transform.scale(
+              scale: 1.2,
+              child: Checkbox(
+                key: index == 0 ? keyCheckmark : null,
+                value: dose.status == 'taken',
+                activeColor: AppColors.primaryBlue,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5)),
+                onChanged: (value) async {
+                  final repository =
+                      DoseLogRepositoryImpl(
+                          FirestoreService());
+
+                  if (value == true) {
+                    await repository.markAsTaken(
+                        dose.medicatieId,
+                        dose.id);
+                  } else {
+                    await repository.markAsPending(
+                        dose.medicatieId,
+                        dose.id);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   @override
   void didChangeDependencies() {
