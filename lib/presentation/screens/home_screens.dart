@@ -636,6 +636,7 @@ List<DoseLogEntity> _getDosesForSelectedDate() {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
             onPressed: () async {
+              Navigator.pop(context);
               await _deleteMedication(med);
               ScaffoldMessenger.of(this.context).showSnackBar(
                 SnackBar(
