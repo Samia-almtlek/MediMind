@@ -643,6 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
             onPressed: () async {
+              Navigator.pop(context);
               await _deleteMedication(med);
               ScaffoldMessenger.of(this.context).showSnackBar(
                 SnackBar(
