@@ -70,6 +70,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
       selectedTimes = [const TimeOfDay(hour: 8, minute: 0)];
     }
 
+    _ensureSelectedTimesMatchFrequency();
+
     if (med.id.isNotEmpty) {
       try {
         final doc = await FirebaseFirestore.instance
@@ -89,6 +91,32 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
     if (mounted) setState(() {});
   }
 
+  void _ensureSelectedTimesMatchFrequency() {
+    if (frequency < 1) {
+      frequency = 1;
+    }
+
+    final normalized = List<TimeOfDay>.from(selectedTimes);
+    if (normalized.isEmpty) {
+      normalized.add(const TimeOfDay(hour: 8, minute: 0));
+    }
+
+    final int interval = (24 / frequency).floor().clamp(1, 24);
+
+    while (normalized.length < frequency) {
+      final idx = normalized.length;
+      normalized.add(
+        TimeOfDay(hour: (8 + (idx * interval)) % 24, minute: 0),
+      );
+    }
+
+    if (normalized.length > frequency) {
+      normalized.removeRange(frequency, normalized.length);
+    }
+
+    selectedTimes = normalized;
+  }
+
   List<TimeOfDay> _extractTimesFromInstructions(String instructions) {
     String source = instructions;
     if (source.contains('Times:')) {
@@ -106,11 +134,27 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
 
     final parsed = <TimeOfDay>[];
     for (final t in times) {
-      final hhmm = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(t);
+      final value = t.trim();
+
+      final hhmm = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(value);
       if (hhmm != null) {
         final h = int.tryParse(hhmm.group(1)!) ?? 8;
         final m = int.tryParse(hhmm.group(2)!) ?? 0;
         if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+          parsed.add(TimeOfDay(hour: h, minute: m));
+        }
+        continue;
+      }
+
+      final ampm = RegExp(r'^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$').firstMatch(value);
+      if (ampm != null) {
+        int h = int.tryParse(ampm.group(1)!) ?? 8;
+        final m = int.tryParse(ampm.group(2)!) ?? 0;
+        final period = ampm.group(3)!.toLowerCase();
+
+        if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+          h = h % 12;
+          if (period == 'pm') h += 12;
           parsed.add(TimeOfDay(hour: h, minute: m));
         }
       }
@@ -137,6 +181,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
           TimeOfDay(hour: (8 + (i * interval)) % 24, minute: 0),
         );
       }
+      _ensureSelectedTimesMatchFrequency();
     });
   }
 
@@ -426,6 +471,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
   }
 
   Widget _buildTimePickerList() {
+    _ensureSelectedTimesMatchFrequency();
     return Column(
       children: List.generate(frequency, (index) {
         return ListTile(

@@ -15,14 +15,14 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  List<UserMedicationModel> _currentMeds = []; 
-   @override
+  List<UserMedicationModel> _currentMeds = [];
+  @override
   void dispose() {
     TTSService.instance.stopIfSpeaking();
     super.dispose();
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -41,47 +41,49 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
             onPressed: () {
               if (_currentMeds.isEmpty) {
-  TTSService.instance.speak("Loading medications, please wait.");
-  return;
-}
-  final activeMeds = _currentMeds.where((med) {
-    final today = DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    );
+                TTSService.instance.speak("Loading medications, please wait.");
+                return;
+              }
+              final activeMeds = _currentMeds.where((med) {
+                final today = DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                );
 
-    final endDateOnly = DateTime(
-      (med.endDate ?? med.startDate).year,
-      (med.endDate ?? med.startDate).month,
-      (med.endDate ?? med.startDate).day,
-    );
+                final endDateOnly = DateTime(
+                  (med.endDate ?? med.startDate).year,
+                  (med.endDate ?? med.startDate).month,
+                  (med.endDate ?? med.startDate).day,
+                );
 
-    final isDatePassed = today.isAfter(endDateOnly);
-    return !isDatePassed && med.isActive;
-  }).toList();
+                final isDatePassed = today.isAfter(endDateOnly);
+                final isCompletedToday = med.completedDates
+                    .any((d) => DateUtils.isSameDay(d, today));
 
-  if (activeMeds.isEmpty) {
-    TTSService.instance.speak(
-      "You currently have no active treatment plans."
-    );
-    return;
-  }
+                return !isDatePassed && med.isActive && !isCompletedToday;
+              }).toList();
 
-  String summary =
-      "You have ${activeMeds.length} active medications. ";
+              if (activeMeds.isEmpty) {
+                TTSService.instance
+                    .speak("You currently have no active treatment plans.");
+                return;
+              }
 
-  for (var med in activeMeds) {
-    summary +=
-        "${med.name}, dosage ${med.dosage}, scheduled at ${med.intakeTimes.join(", ")}. ";
+              String summary =
+                  "You have ${activeMeds.length} active medications. ";
 
-    if (med.currentStock <= med.lowStockThresholdDays) {
-      summary += "Warning. Low stock for ${med.name}. ";
-    }
-  }
+              for (var med in activeMeds) {
+                summary +=
+                    "${med.name}, dosage ${med.dosage}, scheduled at ${med.intakeTimes.join(", ")}. ";
 
-  TTSService.instance.speak(summary);
-},
+                if (med.currentStock <= med.lowStockThresholdDays) {
+                  summary += "Warning. Low stock for ${med.name}. ";
+                }
+              }
+
+              TTSService.instance.speak(summary);
+            },
           ),
         ],
       ),
@@ -100,13 +102,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState();
                 }
- final meds = snapshot.data!.docs
-    .map((doc) => UserMedicationModel.fromFirestore(doc))
-    .toList();
+                final meds = snapshot.data!.docs
+                    .map((doc) => UserMedicationModel.fromFirestore(doc))
+                    .toList();
 
-_currentMeds = meds; 
+                _currentMeds = meds;
 
-return _buildGroupedTreatmentList(meds, context);
+                return _buildGroupedTreatmentList(meds, context);
               },
             ),
     );
@@ -167,7 +169,10 @@ return _buildGroupedTreatmentList(meds, context);
 
     bool isDatePassed = today.isAfter(endDateOnly);
 
-    final bool isActive = !isDatePassed && med.isActive;
+    final bool isCompletedToday =
+        med.completedDates.any((d) => DateUtils.isSameDay(d, today));
+
+    final bool isActive = !isDatePassed && med.isActive && !isCompletedToday;
 
     final bool isLowStock = med.currentStock <= med.lowStockThresholdDays;
 
@@ -238,8 +243,6 @@ return _buildGroupedTreatmentList(meds, context);
                   ),
 
                 SizedBox(height: 6),
-
-                
               ],
             ),
           ),

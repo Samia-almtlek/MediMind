@@ -48,7 +48,10 @@ class Medication {
       frequency: "${data['frequencyPerDay']}x per day",
       startDate: (data['startDate'] as Timestamp).toDate(),
       endDate: (data['endDate'] as Timestamp).toDate(),
-      completedDates: [], // Initialize empty or fetch from separate field
+      completedDates: (data['completedDates'] as List<dynamic>? ?? const [])
+          .whereType<Timestamp>()
+          .map((ts) => ts.toDate())
+          .toList(),
       instructions: data['instructions'] ?? '',
     );
   }
