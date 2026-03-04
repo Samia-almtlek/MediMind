@@ -15,12 +15,14 @@ class TreatmentDurationScreen extends StatefulWidget {
   final String dosage;
   final String? notes;
   final Medication? medicationToEdit;
+  final bool isFromScanner;
 
   TreatmentDurationScreen({
     required this.medicationName,
     required this.dosage,
     this.notes,
     this.medicationToEdit,
+    this.isFromScanner = false,
   });
 
   @override
@@ -82,7 +84,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         if (data != null && mounted) {
           setState(() {
             currentStock = (data['currentStock'] as num?)?.toInt() ?? 0;
-            _initialStock = (data['initialStock'] as num?)?.toInt() ?? currentStock ?? 0;
+            _initialStock =
+                (data['initialStock'] as num?)?.toInt() ?? currentStock ?? 0;
           });
         }
       } catch (_) {}
@@ -146,7 +149,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
         continue;
       }
 
-      final ampm = RegExp(r'^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$').firstMatch(value);
+      final ampm =
+          RegExp(r'^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$').firstMatch(value);
       if (ampm != null) {
         int h = int.tryParse(ampm.group(1)!) ?? 8;
         final m = int.tryParse(ampm.group(2)!) ?? 0;
@@ -164,7 +168,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
 
   String _buildInstructionsText() {
     final times = selectedTimes
-        .map((t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+        .map((t) =>
+            '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
         .join(', ');
     final note = widget.notes?.trim();
     return 'Times: $times. Notes: ${note == null || note.isEmpty ? '-' : note}';
@@ -323,11 +328,13 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
 
                   final String uid = user.uid;
                   final intakeTimes = selectedTimes
-                      .map((t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
+                      .map((t) =>
+                          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}')
                       .toList();
                   final instructionsText = _buildInstructionsText();
 
-                  if (widget.medicationToEdit != null && widget.medicationToEdit!.id.isNotEmpty) {
+                  if (widget.medicationToEdit != null &&
+                      widget.medicationToEdit!.id.isNotEmpty) {
                     final medId = widget.medicationToEdit!.id;
 
                     await FirebaseFirestore.instance
@@ -342,7 +349,8 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                       'instructions': instructionsText,
                       'intakeTimes': intakeTimes,
                       'currentStock': currentStock,
-                      'initialStock': _initialStock == 0 ? currentStock : _initialStock,
+                      'initialStock':
+                          _initialStock == 0 ? currentStock : _initialStock,
                     });
 
                     final oldDoseLogs = await FirebaseFirestore.instance
@@ -366,8 +374,9 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                       instructions: instructionsText,
                       intakeTimes: intakeTimes,
                       isActive: true,
-                      aangemaaktViaOCR: false,
-                      initialStock: _initialStock == 0 ? currentStock! : _initialStock,
+                      aangemaaktViaOCR: widget.isFromScanner,
+                      initialStock:
+                          _initialStock == 0 ? currentStock! : _initialStock,
                       currentStock: currentStock!,
                       lowStockThresholdDays: 3,
                       lastStockAlertAt: null,
@@ -391,7 +400,7 @@ class _TreatmentDurationScreenState extends State<TreatmentDurationScreen> {
                       instructions: instructionsText,
                       intakeTimes: intakeTimes,
                       isActive: true,
-                      aangemaaktViaOCR: false,
+                      aangemaaktViaOCR: widget.isFromScanner,
                       initialStock: currentStock!,
                       currentStock: currentStock!,
                       lowStockThresholdDays: 3,
