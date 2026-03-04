@@ -1,0 +1,209 @@
+# TTS Accessibility & Voice Assistance – MediMind
+
+## 1. Purpose of this document
+This document explains how Text-To-Speech (TTS) accessibility is implemented in the MediMind project.
+
+The goal is to:
+
+- Improve accessibility for visually impaired users  
+- Allow users to hear medication information  
+- Provide spoken summaries of treatments  
+- Prevent overlapping voice playback  
+- Maintain clean architecture through a centralized TTS service  
+
+This system ensures inclusive design and controlled voice behavior across the entire app.
+
+---
+
+## 2. Technology Used
+
+- flutter_tts package
+- Hive (for voice preference persistence)
+- Central TTSService (Singleton pattern)
+
+IMPORTANT:
+- TTS must NEVER be implemented directly inside screens.
+- All voice functionality must go through TTSService.
+
+---
+
+## 3. Architecture Overview
+
+Voice functionality is centralized in:
+
+`lib/core/service/tts_service.dart`
+
+UI triggers speech using:
+
+`TTSService.instance.speak(text)`
+
+To prevent overlapping speech:
+
+`TTSService.instance.stopIfSpeaking()`
+
+---
+
+## 4. Core Design Principles
+
+### Centralized Control
+All voice playback is controlled by a single TTSService instance.
+
+### No Overlapping Audio
+Before navigating screens or starting new speech:
+- stopIfSpeaking() is called
+- dispose() methods stop active speech
+
+### Screen Lifecycle Safety
+Each major screen includes:
+
+@override
+void dispose() {
+TTSService.instance.stopIfSpeaking();
+super.dispose();
+}
+
+
+
+This prevents background audio when navigating.
+
+---
+
+## 5. Voice Integration by Screen
+
+### Home Screen
+- Each dose has a volume icon
+- Speaks:
+  "Medication scheduled at HH:MM."
+
+### Schedule Screen
+- AppBar voice icon
+- Generates dynamic summary:
+  - Number of active medications
+  - Dosage
+  - Intake times
+  - Low stock warnings
+
+### Medical ID Screen
+- Speaks full medical summary:
+  - Blood type
+  - Allergies
+  - Emergency contact
+
+### Medications (Cabinet)
+- Speaks:
+  - Number of medications
+  - Dosage
+  - Current stock levels
+
+### Privacy Screen
+- Speaks:
+  - Privacy overview
+  - Policy details
+  - GDPR rights explanations
+- Dialog popups include SpeakerButton
+
+### Main Screen (Bottom Navigation)
+- Automatically stops speech when switching tabs
+
+void _onItemTapped(int index) {
+TTSService.instance.stopIfSpeaking();
+setState(() {
+_selectedIndex = index;
+});
+}
+
+
+---
+
+## 6. SpeakerButton Widget
+
+Reusable component located in:
+
+`lib/core/widgets/speaker_button.dart`
+
+Purpose:
+- Attach voice playback to text sections
+- Used inside dialogs and info popups
+- Ensures consistent UI behavior
+
+---
+
+## 7. Voice Settings (User Control)
+
+Stored locally in Hive:
+
+Box:
+`notification_settings`
+
+Key:
+`voiceEnabled`
+
+Users can enable/disable:
+- Voice reminder playback
+- Spoken notifications
+
+IMPORTANT:
+- Voice preference must be checked before speaking.
+- Do NOT bypass user preference.
+
+---
+
+## 8. Voice Summary Logic
+
+Dynamic summaries are generated using:
+
+- Active medication filtering
+- Date comparison
+- Stock threshold detection
+- Firestore data streams
+
+Example logic:
+- Only active medications
+- Exclude completed today
+- Add low stock warnings
+
+This ensures summaries are context-aware and safe.
+
+---
+
+## 9. Accessibility & Compliance Considerations
+
+The voice system:
+
+- Does NOT give medical advice
+- Only reads stored data
+- Respects user privacy settings
+- Stops immediately when navigating
+- Does not autoplay without user action (except controlled summaries)
+
+---
+
+## 10. What Must NOT Be Changed
+
+- TTSService structure
+- Singleton pattern usage
+- stopIfSpeaking() calls
+- Voice toggle Hive key names
+- Screen-level dispose stop logic
+
+Changing these may cause:
+- Overlapping audio
+- Background playback
+- Accessibility inconsistencies
+- Broken navigation behavior
+
+---
+
+## 11. Git & Branching
+
+TTS Accessibility was implemented as part of:
+
+feature/tts-audio-support
+
+All future accessibility improvements must extend this structure.
+
+
+
+
+
+
