@@ -16,7 +16,7 @@ The tour system provides first-time contextual walkthroughs using highlighted UI
 
 ## 3. Packages & dependencies used
 - `tutorial_coach_mark`: builds spotlight targets (`TargetFocus`) and renders the guided overlay UI.
-- `shared_preferences`: stores one-time tour flags (`main_tour_seen`, `home_tour_seen`, `chat_tour_seen`, `profile_tour_seen`).
+- `shared_preferences`: stores one-time tour flags (`main_tour_seen`, `home_tour_seen`, `schedule_tour_seen`, `chat_tour_seen`, `profile_tour_seen`).
 - `flutter/material.dart`: provides core UI primitives, `GlobalKey`, and screen lifecycle hooks used by the tour flow.
 
 ---
@@ -32,6 +32,11 @@ The tour system provides first-time contextual walkthroughs using highlighted UI
 - File: `presentation/screens/home_screens.dart`
 - Persistence key: `home_tour_seen`
 - Covers: manage menu, horizontal calendar, dose checkmark action.
+
+### Schedule screen tour
+- File: `presentation/screens/schedule_screen.dart`
+- Persistence key: `schedule_tour_seen`
+- Covers: voice summary button, first treatment card details.
 
 ### Chat screen tour
 - File: `presentation/screens/chat_screen.dart`
@@ -65,6 +70,7 @@ The tour system provides first-time contextual walkthroughs using highlighted UI
 - SharedPreferences keys:
   - `main_tour_seen`
   - `home_tour_seen`
+  - `schedule_tour_seen`
   - `chat_tour_seen`
   - `profile_tour_seen`
 - GlobalKey-to-widget mapping for each target.

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../../utils/app_colors.dart';
 import '../../data/models/user_medication_model.dart'; // 🔥 changed model
@@ -16,6 +18,138 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   List<UserMedicationModel> _currentMeds = [];
+  final GlobalKey _keyTtsButton = GlobalKey();
+  final GlobalKey _keyTreatmentCard = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  Future<void> _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('schedule_tour_seen') ?? false;
+    if (seen || !mounted) return;
+    _showTutorial();
+    await prefs.setBool('schedule_tour_seen', true);
+  }
+
+  void _showTutorial() {
+    final targets = <TargetFocus>[];
+
+    void addIfVisible({
+      required String identify,
+      required GlobalKey key,
+      required String title,
+      required String message,
+      required ContentAlign align,
+    }) {
+      if (key.currentContext != null) {
+        targets.add(_buildTarget(
+          identify: identify,
+          key: key,
+          title: title,
+          message: message,
+          align: align,
+        ));
+      }
+    }
+
+    addIfVisible(
+      identify: 'schedule_tts',
+      key: _keyTtsButton,
+      title: 'Voice summary',
+      message: 'Tap here to hear a spoken summary of your active treatments.',
+      align: ContentAlign.bottom,
+    );
+    addIfVisible(
+      identify: 'schedule_treatment_card',
+      key: _keyTreatmentCard,
+      title: 'Treatment card',
+      message:
+          'Each card shows dosage, times, stock status, and active or finished state.',
+      align: ContentAlign.top,
+    );
+
+    if (targets.isEmpty) return;
+
+    TutorialCoachMark(
+      targets: targets,
+      colorShadow: AppColors.primaryBlue,
+      opacityShadow: 0.78,
+      alignSkip: Alignment.topLeft,
+      skipWidget: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 14, top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundWhite.withOpacity(0.18),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.lightTeal.withOpacity(0.9)),
+          ),
+          child: const Text(
+            'SKIP',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ),
+      paddingFocus: 8,
+    ).show(context: context);
+  }
+
+  TargetFocus _buildTarget({
+    required String identify,
+    required GlobalKey key,
+    required String title,
+    required String message,
+    required ContentAlign align,
+  }) {
+    return TargetFocus(
+      identify: identify,
+      keyTarget: key,
+      contents: [
+        TargetContent(
+          align: align,
+          builder: (_, __) => Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.iconGrey.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.lightTeal.withOpacity(0.75)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     TTSService.instance.stopIfSpeaking();
@@ -38,6 +172,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            key: _keyTtsButton,
             icon: const Icon(Icons.volume_up, color: AppColors.primaryBlue),
             onPressed: () {
               if (_currentMeds.isEmpty) {
@@ -149,7 +284,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ),
             ),
             ...medsInMonth
-                .map((med) => _buildTreatmentCard(med, context))
+                .asMap()
+                .entries
+                .map((entry) => _buildTreatmentCard(entry.value, context,
+                    isFirstCard: index == 0 && entry.key == 0))
                 .toList(),
           ],
         );
@@ -158,7 +296,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// 🔥 CARD WITH STOCK + REFILL
-  Widget _buildTreatmentCard(UserMedicationModel med, BuildContext context) {
+  Widget _buildTreatmentCard(UserMedicationModel med, BuildContext context,
+      {bool isFirstCard = false}) {
     final DateTime today =
         DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
@@ -177,6 +316,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final bool isLowStock = med.currentStock <= med.lowStockThresholdDays;
 
     return Container(
+      key: isFirstCard ? _keyTreatmentCard : null,
       margin: EdgeInsets.only(bottom: 16),
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
