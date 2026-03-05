@@ -1,0 +1,269 @@
+# Authentication System – MediMind
+
+## 1. Purpose of this document
+This document explains how Authentication is implemented in the MediMind project.  
+It is meant to help any team member continue development without breaking the authentication flow.
+
+---
+
+## 2. Authentication Overview
+MediMind uses Firebase Authentication for:
+
+- Email & Password registration  
+- Email & Password login  
+- Google Sign-In  
+- Email verification  
+- Password reset  
+- User session handling  
+
+Authentication logic is centralized inside:
+
+`lib/auth/service/auth_service.dart`
+
+IMPORTANT:  
+- UI screens must NOT directly use FirebaseAuth.  
+- All authentication logic must go through AuthService.
+
+---
+
+## 3. Tools & Technologies
+- Flutter (Dart)  
+- Firebase Authentication  
+- Cloud Firestore  
+- Google Sign-In  
+
+Dependencies (pubspec.yaml):
+
+- firebase_core  
+- firebase_auth  
+- cloud_firestore  
+- google_sign_in  
+
+---
+
+## 4. Architecture Structure
+Authentication is separated into:
+
+**UI Layer**
+- LoginScreen  
+- RegisterScreen  
+- AuthGate  
+
+**Service Layer**
+- AuthService  
+
+IMPORTANT:  
+- Business logic must remain inside AuthService.  
+- UI must only call service methods.
+
+---
+
+## 5. User Registration (Email & Password)
+
+Implemented in:  
+`RegisterScreen → AuthService.signUp()`
+
+Registration flow:
+
+1. User enters:
+   - Full Name  
+   - Email  
+   - Password  
+   - Confirm Password  
+
+2. Validations:
+   - Email format validation (RegEx)  
+   - Password match validation  
+   - Password strength validation:
+     - Minimum 8 characters  
+     - At least 1 uppercase letter  
+     - At least 1 number  
+
+3. Firebase account creation:
+
+`_auth.createUserWithEmailAndPassword()`
+
+4. After successful creation:
+
+A Firestore document is created in:
+
+Collection: `users`  
+Document ID: `user.uid`
+
+Stored fields:
+- uid  
+- fullName  
+- email  
+- profilePhotoUrl  
+- notificationsEnabled  
+- createdAt (serverTimestamp)  
+- lastLogin (serverTimestamp)  
+
+5. Email verification is sent:
+`user.sendEmailVerification()`
+
+6. User is immediately signed out.
+
+IMPORTANT:
+- Users CANNOT access the app without verifying email.  
+- Firestore document is created during registration.
+
+---
+
+## 6. Email Verification Enforcement
+
+Email verification is enforced in:
+- LoginScreen  
+- AuthGate  
+
+Flow:
+
+After login:
+- User is reloaded using `user.reload()`  
+- If `emailVerified == false`:
+  - Login is blocked  
+  - A dialog is shown  
+  - User can resend verification email  
+  - User can sign out  
+
+AuthGate checks:
+- If `user.emailVerified == true` → MainScreen  
+- If false → LoginScreen  
+
+IMPORTANT:
+- Email verification is mandatory.
+
+---
+
+## 7. Login (Email & Password)
+
+Implemented in:  
+`LoginScreen → AuthService.signIn()`
+
+Login flow:
+
+1. Email format validation  
+2. Firebase login:
+`_auth.signInWithEmailAndPassword()`  
+
+3. After successful login:
+- Firestore updates `lastLogin → serverTimestamp`
+
+Error handling includes:
+- invalid-email  
+- wrong-password  
+- user-not-found  
+- user-disabled  
+- too-many-requests  
+
+IMPORTANT:
+- Raw Firebase errors must NOT be exposed to the UI.  
+- All errors are handled inside AuthService.
+
+---
+
+## 8. Google Sign-In
+
+Implemented in:  
+`AuthService.signInWithGoogle()`
+
+Flow:
+1. `GoogleSignIn().signIn()`  
+2. Retrieve authentication tokens  
+3. Create Firebase credential:
+   `GoogleAuthProvider.credential()`  
+4. Sign in with:
+   `_auth.signInWithCredential()`  
+
+Firestore behavior:
+
+If user does NOT exist:
+- Create new user document  
+- provider: "google"  
+- createdAt  
+- lastLogin  
+
+If user exists:
+- Update lastLogin only  
+
+IMPORTANT:
+- Google users are stored in the same `users` collection.
+
+---
+
+## 9. Password Reset
+
+Implemented in:  
+`AuthService.sendPasswordResetEmail()`
+
+Flow:
+- User enters email  
+- Firebase sends reset email  
+
+Security rule:
+- No error is shown if email does not exist  
+
+IMPORTANT:
+- Do NOT reveal whether an email is registered.
+
+---
+
+## 10. Session Management (AuthGate)
+
+AuthGate listens to:
+
+`_auth.authStateChanges()`
+
+Behavior:
+- If connectionState == waiting → Show loading indicator  
+- If user exists AND emailVerified == true → Navigate to MainScreen  
+- Otherwise → Navigate to LoginScreen  
+
+IMPORTANT:
+- AuthGate controls all session redirection.
+
+---
+
+## 11. Firestore Structure (Users Collection)
+
+Collection: `users`  
+Document ID: `uid`
+
+Fields:
+- uid  
+- fullName  
+- email  
+- profilePhotoUrl  
+- notificationsEnabled  
+- createdAt  
+- lastLogin  
+- provider (Google users only)
+
+IMPORTANT:
+- Collection name must remain `users`.
+
+---
+
+## 12. What must NOT be changed
+
+- Collection name: `users`  
+- AuthService method structure  
+- Email verification enforcement  
+- AuthGate logic  
+- Firestore field names  
+- Google Sign-In integration flow  
+
+Changing these may break:
+- Login  
+- Registration  
+- Session handling  
+
+---
+
+## 13. Git & Branching
+
+Authentication system is implemented in branch:
+
+`feature/authentication-system`
+
+All future authentication-related features must be built on top of this structure.

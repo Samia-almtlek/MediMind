@@ -4,6 +4,8 @@ import '../../utils/app_colors.dart';
 import 'treatment_duration_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/widgets/speaker_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 class ScanBarcodeScreen extends StatefulWidget {
   const ScanBarcodeScreen({super.key});
 
@@ -19,8 +21,7 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
   bool isScanning = true;
   bool isTorchOn = false;
 
-  // Placeholder ID until you add Firebase Auth
-  final String currentUserId = "5E4oT7RrhVZyN1RYMDZEQVMzuI13"; //need change
+  String get currentUserId => FirebaseAuth.instance.currentUser?.uid ?? "unknown_user";
 
   @override
   void dispose() {
@@ -149,7 +150,7 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor:
-                        AppColors.primaryBlue, // Use your app's primary color
+                        AppColors.primaryBlue,
                   ),
                   onPressed: () {
                     Navigator.pop(context); // Close the bottom sheet
@@ -159,8 +160,9 @@ class _ScanBarcodeScreenState extends State<ScanBarcodeScreen> {
                       MaterialPageRoute(
                         builder: (context) => TreatmentDurationScreen(
                           medicationName:
-                              title, // Pass data if your screen accepts it
-                          dosage: subtitle, // Example: pass the dosage info
+                              title, 
+                          dosage: subtitle,
+                          isFromScanner: true, 
                         ),
                       ),
                     ).then((_) {
