@@ -35,6 +35,13 @@ class _ChatScreenState extends State<ChatScreen> {
   _PendingDoseDosageRequest? _pendingDoseDosageRequest;
   _PendingDoseAmbiguityRequest? _pendingDoseAmbiguityRequest;
   _PendingStockRequest? _pendingStockRequest;
+  _PendingScheduleAmountRequest? _pendingScheduleAmountRequest;
+  _PendingScheduleConfirmRequest? _pendingScheduleConfirmRequest;
+  _PendingStockMedicationRequest? _pendingStockMedicationRequest;
+  _PendingDurationTimeRequest? _pendingDurationTimeRequest;
+  _PendingDurationAmountRequest? _pendingDurationAmountRequest;
+  _PendingDurationConfirmRequest? _pendingDurationConfirmRequest;
+  _PendingDurationMedicationRequest? _pendingDurationMedicationRequest;
   final GlobalKey _keyAssistantBadge = GlobalKey();
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
@@ -370,8 +377,23 @@ class _ChatScreenState extends State<ChatScreen> {
     return 'I found multiple dosages for $medicationName ($labels). Which one should I log?';
   }
 
+  String _buildStockDosagePrompt(String medicationName, List<String> dosageLabels) {
+    final labels = [...dosageLabels, 'other'].join(', ');
+    return 'I found multiple dosages for $medicationName ($labels). Which one should I update the stock for?';
+  }
+
   bool _isOtherChoice(String userText) {
     return RegExp(r'\bother\b', caseSensitive: false).hasMatch(userText);
+  }
+
+  bool _isAffirmative(String userText) {
+    return RegExp(r'\b(yes|yep|yeah|sure|ok|okay|confirm)\b', caseSensitive: false)
+        .hasMatch(userText);
+  }
+
+  bool _isNegative(String userText) {
+    return RegExp(r'\b(no|nope|nah|cancel)\b', caseSensitive: false)
+        .hasMatch(userText);
   }
 
   bool _dosageMatches(ParsedDoseAmount a, ParsedDoseAmount b) {
@@ -412,6 +434,27 @@ class _ChatScreenState extends State<ChatScreen> {
       medicationName: medication.name,
     );
     return '$response How many units do you have left for ${medication.name}?';
+  }
+
+  String _formatScheduledTime(DateTime scheduledTime) {
+    final hour = scheduledTime.hour.toString().padLeft(2, '0');
+    final minute = scheduledTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  DateTime? _parseTimeFromText(String userText, DateTime baseDate) {
+    final match = RegExp(r'\b(\d{1,2}):(\d{2})\b').firstMatch(userText);
+    if (match == null) {
+      return null;
+    }
+
+    final hour = int.tryParse(match.group(1) ?? '');
+    final minute = int.tryParse(match.group(2) ?? '');
+    if (hour == null || minute == null) {
+      return null;
+    }
+
+    return DateTime(baseDate.year, baseDate.month, baseDate.day, hour, minute);
   }
 
   List<String> _uniqueDosageLabels(List<MedicationOption> options) {
@@ -508,6 +551,311 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<String?> _tryHandleDoseLoggingIntent(String userText) async {
+    final pendingDurationConfirm = _pendingDurationConfirmRequest;
+    if (pendingDurationConfirm != null) {
+      if (_isAffirmative(userText)) {
+        _pendingDurationConfirmRequest = null;
+        await _doseLoggingService.scheduleDurationDoses(
+          medication: pendingDurationConfirm.medication,
+          startDate: pendingDurationConfirm.startDate,
+          days: pendingDurationConfirm.days,
+          hour: pendingDurationConfirm.timeOfDay.hour,
+          minute: pendingDurationConfirm.timeOfDay.minute,
+          amount: pendingDurationConfirm.amount,
+        );
+
+        final timeLabel = _formatScheduledTime(pendingDurationConfirm.timeOfDay);
+        final response =
+            'Okay, I scheduled ${pendingDurationConfirm.medication.name} daily at $timeLabel for ${pendingDurationConfirm.days} days.';
+        return pendingDurationConfirm.wasFromProduct
+            ? _appendStockPrompt(response, pendingDurationConfirm.medication)
+            : response;
+      }
+
+      if (_isNegative(userText)) {
+        _pendingDurationConfirmRequest = null;
+        return 'Okay, I will leave it as is.';
+      }
+
+      return 'Please confirm if you want me to add it to your schedule.';
+    }
+
+    final pendingDurationAmount = _pendingDurationAmountRequest;
+    if (pendingDurationAmount != null) {
+      final parsedAmount = _doseLoggingService.parseDoseAmount(userText);
+      if (parsedAmount == null) {
+        return 'Please provide both amount and unit so I can schedule it (example: 200 mg).';
+      }
+
+      _pendingDurationAmountRequest = null;
+      final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+        medicationId: pendingDurationAmount.medication.id,
+        scheduledTime: pendingDurationAmount.timeOfDay,
+      );
+
+      if (conflict) {
+        _pendingDurationConfirmRequest = _PendingDurationConfirmRequest(
+          medication: pendingDurationAmount.medication,
+          startDate: pendingDurationAmount.startDate,
+          days: pendingDurationAmount.days,
+          timeOfDay: pendingDurationAmount.timeOfDay,
+          amount: parsedAmount,
+          wasFromProduct: pendingDurationAmount.wasFromProduct,
+        );
+        final timeLabel = _formatScheduledTime(pendingDurationAmount.timeOfDay);
+        return 'You already have ${pendingDurationAmount.medication.name} scheduled at $timeLabel. Add it anyway?';
+      }
+
+      await _doseLoggingService.scheduleDurationDoses(
+        medication: pendingDurationAmount.medication,
+        startDate: pendingDurationAmount.startDate,
+        days: pendingDurationAmount.days,
+        hour: pendingDurationAmount.timeOfDay.hour,
+        minute: pendingDurationAmount.timeOfDay.minute,
+        amount: parsedAmount,
+      );
+
+      final timeLabel = _formatScheduledTime(pendingDurationAmount.timeOfDay);
+      final response =
+          'Scheduled ${pendingDurationAmount.medication.name} daily at $timeLabel for ${pendingDurationAmount.days} days.';
+      return pendingDurationAmount.wasFromProduct
+          ? _appendStockPrompt(response, pendingDurationAmount.medication)
+          : response;
+    }
+
+    final pendingDurationTime = _pendingDurationTimeRequest;
+    if (pendingDurationTime != null) {
+      final timeOfDay =
+          _parseTimeFromText(userText, pendingDurationTime.startDate);
+      if (timeOfDay == null) {
+        return 'What time each day should I schedule ${pendingDurationTime.medication.name}? (example: 08:00)';
+      }
+
+      _pendingDurationTimeRequest = null;
+      final parsedAmount = pendingDurationTime.amount ??
+          _doseLoggingService.parseOptionDosage(pendingDurationTime.medication);
+
+      if (parsedAmount == null) {
+        _pendingDurationAmountRequest = _PendingDurationAmountRequest(
+          medication: pendingDurationTime.medication,
+          startDate: pendingDurationTime.startDate,
+          days: pendingDurationTime.days,
+          timeOfDay: timeOfDay,
+          wasFromProduct: pendingDurationTime.wasFromProduct,
+        );
+        return 'Please specify the amount and unit to schedule ${pendingDurationTime.medication.name} (example: 200 mg).';
+      }
+
+      final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+        medicationId: pendingDurationTime.medication.id,
+        scheduledTime: timeOfDay,
+      );
+
+      if (conflict) {
+        _pendingDurationConfirmRequest = _PendingDurationConfirmRequest(
+          medication: pendingDurationTime.medication,
+          startDate: pendingDurationTime.startDate,
+          days: pendingDurationTime.days,
+          timeOfDay: timeOfDay,
+          amount: parsedAmount,
+          wasFromProduct: pendingDurationTime.wasFromProduct,
+        );
+        final timeLabel = _formatScheduledTime(timeOfDay);
+        return 'You already have ${pendingDurationTime.medication.name} scheduled at $timeLabel. Add it anyway?';
+      }
+
+      await _doseLoggingService.scheduleDurationDoses(
+        medication: pendingDurationTime.medication,
+        startDate: pendingDurationTime.startDate,
+        days: pendingDurationTime.days,
+        hour: timeOfDay.hour,
+        minute: timeOfDay.minute,
+        amount: parsedAmount,
+      );
+
+      final timeLabel = _formatScheduledTime(timeOfDay);
+      final response =
+          'Scheduled ${pendingDurationTime.medication.name} daily at $timeLabel for ${pendingDurationTime.days} days.';
+      return pendingDurationTime.wasFromProduct
+          ? _appendStockPrompt(response, pendingDurationTime.medication)
+          : response;
+    }
+
+    final pendingDurationMedication = _pendingDurationMedicationRequest;
+    if (pendingDurationMedication != null) {
+      final selectedMedication =
+          _resolveAmbiguousMedicationReply(userText, pendingDurationMedication.request);
+      if (selectedMedication == null) {
+        return _buildAmbiguousMedicationPrompt(pendingDurationMedication.request.options);
+      }
+
+      _pendingDurationMedicationRequest = null;
+      final wasFromProduct = selectedMedication.isFromProduct;
+      final ensuredMedication =
+          await _doseLoggingService.ensureUserMedication(selectedMedication);
+
+      if (pendingDurationMedication.timeOfDay == null) {
+        _pendingDurationTimeRequest = _PendingDurationTimeRequest(
+          medication: ensuredMedication,
+          startDate: pendingDurationMedication.startDate,
+          days: pendingDurationMedication.days,
+          amount: pendingDurationMedication.amount,
+          wasFromProduct: wasFromProduct,
+        );
+        return 'What time each day should I schedule ${ensuredMedication.name}? (example: 08:00)';
+      }
+
+      final timeOfDay = pendingDurationMedication.timeOfDay!;
+      final parsedAmount = pendingDurationMedication.amount ??
+          _doseLoggingService.parseOptionDosage(ensuredMedication);
+      if (parsedAmount == null) {
+        _pendingDurationAmountRequest = _PendingDurationAmountRequest(
+          medication: ensuredMedication,
+          startDate: pendingDurationMedication.startDate,
+          days: pendingDurationMedication.days,
+          timeOfDay: timeOfDay,
+          wasFromProduct: wasFromProduct,
+        );
+        return 'Please specify the amount and unit to schedule ${ensuredMedication.name} (example: 200 mg).';
+      }
+
+      final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+        medicationId: ensuredMedication.id,
+        scheduledTime: timeOfDay,
+      );
+
+      if (conflict) {
+        _pendingDurationConfirmRequest = _PendingDurationConfirmRequest(
+          medication: ensuredMedication,
+          startDate: pendingDurationMedication.startDate,
+          days: pendingDurationMedication.days,
+          timeOfDay: timeOfDay,
+          amount: parsedAmount,
+          wasFromProduct: wasFromProduct,
+        );
+        final timeLabel = _formatScheduledTime(timeOfDay);
+        return 'You already have ${ensuredMedication.name} scheduled at $timeLabel. Add it anyway?';
+      }
+
+      await _doseLoggingService.scheduleDurationDoses(
+        medication: ensuredMedication,
+        startDate: pendingDurationMedication.startDate,
+        days: pendingDurationMedication.days,
+        hour: timeOfDay.hour,
+        minute: timeOfDay.minute,
+        amount: parsedAmount,
+      );
+
+      final timeLabel = _formatScheduledTime(timeOfDay);
+      final response =
+          'Scheduled ${ensuredMedication.name} daily at $timeLabel for ${pendingDurationMedication.days} days.';
+      return wasFromProduct
+          ? _appendStockPrompt(response, ensuredMedication)
+          : response;
+    }
+
+    final pendingStockMedication = _pendingStockMedicationRequest;
+    if (pendingStockMedication != null) {
+      MedicationOption? selectedMedication =
+          _resolveAmbiguousMedicationReply(userText, pendingStockMedication.request);
+
+      final parsedAmount = _doseLoggingService.parseDoseAmount(userText);
+      if (selectedMedication == null && parsedAmount != null) {
+        selectedMedication = _matchOptionByAmount(
+          parsedAmount,
+          pendingStockMedication.request.options,
+        );
+      }
+
+      if (selectedMedication == null) {
+        final labels =
+            _uniqueDosageLabels(pendingStockMedication.request.options);
+        if (labels.isNotEmpty) {
+          return _buildStockDosagePrompt(
+            pendingStockMedication.medicationName,
+            labels,
+          );
+        }
+        return _buildAmbiguousMedicationPrompt(
+          pendingStockMedication.request.options,
+        );
+      }
+
+      _pendingStockMedicationRequest = null;
+      final ensuredMedication =
+          await _doseLoggingService.ensureUserMedication(selectedMedication);
+      await _doseLoggingService.updateMedicationStock(
+        medicationId: ensuredMedication.id,
+        stockCount: pendingStockMedication.count,
+      );
+
+      return 'Updated stock for ${ensuredMedication.name} to ${pendingStockMedication.count}.';
+    }
+
+    final pendingScheduleConfirm = _pendingScheduleConfirmRequest;
+    if (pendingScheduleConfirm != null) {
+      if (_isAffirmative(userText)) {
+        _pendingScheduleConfirmRequest = null;
+        await _doseLoggingService.scheduleDose(
+          medication: pendingScheduleConfirm.medication,
+          scheduledTime: pendingScheduleConfirm.scheduledTime,
+          amount: pendingScheduleConfirm.amount,
+        );
+
+        final timeLabel = _formatScheduledTime(pendingScheduleConfirm.scheduledTime);
+        final response =
+            'Okay, I added another ${pendingScheduleConfirm.medication.name} for $timeLabel.';
+        return pendingScheduleConfirm.wasFromProduct
+            ? _appendStockPrompt(response, pendingScheduleConfirm.medication)
+            : response;
+      }
+
+      if (_isNegative(userText)) {
+        _pendingScheduleConfirmRequest = null;
+        return 'Okay, I will leave it as is.';
+      }
+
+      return 'Please confirm if you want me to add another one.';
+    }
+
+    final pendingScheduleAmount = _pendingScheduleAmountRequest;
+    if (pendingScheduleAmount != null) {
+      final parsedAmount = _doseLoggingService.parseDoseAmount(userText);
+      if (parsedAmount == null) {
+        return 'Please provide both amount and unit so I can schedule it (example: 200 mg).';
+      }
+
+      _pendingScheduleAmountRequest = null;
+      final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+        medicationId: pendingScheduleAmount.medication.id,
+        scheduledTime: pendingScheduleAmount.scheduledTime,
+      );
+
+      if (conflict) {
+        _pendingScheduleConfirmRequest = _PendingScheduleConfirmRequest(
+          medication: pendingScheduleAmount.medication,
+          scheduledTime: pendingScheduleAmount.scheduledTime,
+          amount: parsedAmount,
+          wasFromProduct: pendingScheduleAmount.wasFromProduct,
+        );
+        final timeLabel = _formatScheduledTime(pendingScheduleAmount.scheduledTime);
+        return 'You already have ${pendingScheduleAmount.medication.name} scheduled at $timeLabel. Add another one anyway?';
+      }
+
+      await _doseLoggingService.scheduleDose(
+        medication: pendingScheduleAmount.medication,
+        scheduledTime: pendingScheduleAmount.scheduledTime,
+        amount: parsedAmount,
+      );
+
+      final timeLabel = _formatScheduledTime(pendingScheduleAmount.scheduledTime);
+      final response =
+          'Scheduled ${pendingScheduleAmount.medication.name} for $timeLabel.';
+      return pendingScheduleAmount.wasFromProduct
+          ? _appendStockPrompt(response, pendingScheduleAmount.medication)
+          : response;
+    }
+
     final pendingStock = _pendingStockRequest;
     if (pendingStock != null) {
       final count = _parseStockCount(userText);
@@ -551,10 +899,6 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        _pendingDoseAmountRequest = _PendingDoseAmountRequest(
-          medicationName: ensuredMedication.name,
-          preferredMedication: ensuredMedication,
-        );
         _pendingDoseAmountRequest = _PendingDoseAmountRequest(
           medicationName: ensuredMedication.name,
           preferredMedication: ensuredMedication,
@@ -659,7 +1003,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final parsed = _doseLoggingService.parseDoseIntakeStatement(userText);
     if (parsed == null) {
-      return null;
+      final durationResponse = await _tryHandleDurationScheduleIntent(userText);
+      if (durationResponse != null) {
+        return durationResponse;
+      }
+
+      final scheduleResponse = await _tryHandleScheduleIntent(userText);
+      if (scheduleResponse != null) {
+        return scheduleResponse;
+      }
+
+      final stockResponse = await _tryHandleStockUpdateIntent(userText);
+      return stockResponse;
     }
 
     final resolved =
@@ -777,6 +1132,228 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+  }
+
+  Future<String?> _tryHandleScheduleIntent(String userText) async {
+    final scheduleRequest = _doseLoggingService.parseScheduleRequest(userText);
+    if (scheduleRequest == null) {
+      return null;
+    }
+
+    final resolved = await _doseLoggingService
+        .resolveMedicationOrProduct(scheduleRequest.medicationName);
+
+    MedicationOption? medication;
+    bool wasFromProduct = false;
+    if (resolved.isMatched && resolved.matched != null) {
+      medication = resolved.matched;
+      wasFromProduct = resolved.matched!.isFromProduct;
+    } else if (resolved.isAmbiguous) {
+      _pendingDoseAmbiguityRequest = _PendingDoseAmbiguityRequest(
+        amount: scheduleRequest.amount,
+        options: resolved.ambiguousOptions,
+      );
+      return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+    } else {
+      return 'I could not find a medication matching "${scheduleRequest.medicationName}".';
+    }
+
+    if (medication == null) {
+      return null;
+    }
+
+    medication = await _doseLoggingService.ensureUserMedication(medication);
+
+    final parsedAmount = scheduleRequest.amount ??
+        _doseLoggingService.parseOptionDosage(medication);
+
+    if (parsedAmount == null) {
+      _pendingScheduleAmountRequest = _PendingScheduleAmountRequest(
+        medication: medication,
+        scheduledTime: scheduleRequest.scheduledTime,
+        wasFromProduct: wasFromProduct,
+      );
+      return 'Please specify the amount and unit to schedule ${medication.name} (example: 200 mg).';
+    }
+
+    final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+      medicationId: medication.id,
+      scheduledTime: scheduleRequest.scheduledTime,
+    );
+
+    if (conflict) {
+      _pendingScheduleConfirmRequest = _PendingScheduleConfirmRequest(
+        medication: medication,
+        scheduledTime: scheduleRequest.scheduledTime,
+        amount: parsedAmount,
+        wasFromProduct: wasFromProduct,
+      );
+      final timeLabel = _formatScheduledTime(scheduleRequest.scheduledTime);
+      return 'You already have ${medication.name} scheduled at $timeLabel. Add another one anyway?';
+    }
+
+    await _doseLoggingService.scheduleDose(
+      medication: medication,
+      scheduledTime: scheduleRequest.scheduledTime,
+      amount: parsedAmount,
+    );
+
+    final timeLabel = _formatScheduledTime(scheduleRequest.scheduledTime);
+    final response = 'Scheduled ${medication.name} for $timeLabel.';
+    return wasFromProduct ? _appendStockPrompt(response, medication) : response;
+  }
+
+  Future<String?> _tryHandleDurationScheduleIntent(String userText) async {
+    final durationRequest =
+        _doseLoggingService.parseDurationScheduleRequest(userText);
+    if (durationRequest == null) {
+      return null;
+    }
+
+    final resolved = await _doseLoggingService
+        .resolveMedicationOrProduct(durationRequest.medicationName);
+
+    MedicationOption? medication;
+    bool wasFromProduct = false;
+    if (resolved.isMatched && resolved.matched != null) {
+      medication = resolved.matched;
+      wasFromProduct = resolved.matched!.isFromProduct;
+    } else if (resolved.isAmbiguous) {
+      _pendingDurationMedicationRequest = _PendingDurationMedicationRequest(
+        request: _PendingDoseAmbiguityRequest(
+          amount: durationRequest.amount,
+          options: resolved.ambiguousOptions,
+        ),
+        medicationName: durationRequest.medicationName,
+        startDate: durationRequest.startDate,
+        days: durationRequest.days,
+        timeOfDay: durationRequest.timeOfDay,
+        amount: durationRequest.amount,
+      );
+      return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+    } else {
+      return 'I could not find a medication matching "${durationRequest.medicationName}".';
+    }
+
+    if (medication == null) {
+      return null;
+    }
+
+    medication = await _doseLoggingService.ensureUserMedication(medication);
+
+    final timeOfDay = durationRequest.timeOfDay;
+    if (timeOfDay == null) {
+      _pendingDurationTimeRequest = _PendingDurationTimeRequest(
+        medication: medication,
+        startDate: durationRequest.startDate,
+        days: durationRequest.days,
+        amount: durationRequest.amount,
+        wasFromProduct: wasFromProduct,
+      );
+      return 'What time each day should I schedule ${medication.name}? (example: 08:00)';
+    }
+
+    final parsedAmount = durationRequest.amount ??
+        _doseLoggingService.parseOptionDosage(medication);
+
+    if (parsedAmount == null) {
+      _pendingDurationAmountRequest = _PendingDurationAmountRequest(
+        medication: medication,
+        startDate: durationRequest.startDate,
+        days: durationRequest.days,
+        timeOfDay: timeOfDay,
+        wasFromProduct: wasFromProduct,
+      );
+      return 'Please specify the amount and unit to schedule ${medication.name} (example: 200 mg).';
+    }
+
+    final conflict = await _doseLoggingService.hasScheduledDoseAtTime(
+      medicationId: medication.id,
+      scheduledTime: timeOfDay,
+    );
+
+    if (conflict) {
+      _pendingDurationConfirmRequest = _PendingDurationConfirmRequest(
+        medication: medication,
+        startDate: durationRequest.startDate,
+        days: durationRequest.days,
+        timeOfDay: timeOfDay,
+        amount: parsedAmount,
+        wasFromProduct: wasFromProduct,
+      );
+      final timeLabel = _formatScheduledTime(timeOfDay);
+      return 'You already have ${medication.name} scheduled at $timeLabel. Add it anyway?';
+    }
+
+    await _doseLoggingService.scheduleDurationDoses(
+      medication: medication,
+      startDate: durationRequest.startDate,
+      days: durationRequest.days,
+      hour: timeOfDay.hour,
+      minute: timeOfDay.minute,
+      amount: parsedAmount,
+    );
+
+    final timeLabel = _formatScheduledTime(timeOfDay);
+    final response =
+        'Scheduled ${medication.name} daily at $timeLabel for ${durationRequest.days} days.';
+    return wasFromProduct ? _appendStockPrompt(response, medication) : response;
+  }
+
+  Future<String?> _tryHandleStockUpdateIntent(String userText) async {
+    final stockUpdate = _doseLoggingService.parseStockUpdateRequest(userText);
+    if (stockUpdate == null) {
+      return null;
+    }
+
+    final resolved = await _doseLoggingService
+        .resolveMedicationOrProduct(stockUpdate.medicationName);
+
+    MedicationOption? medication;
+    if (resolved.isMatched && resolved.matched != null) {
+      medication = resolved.matched;
+    } else if (resolved.isAmbiguous) {
+      final matchedOption = stockUpdate.amount == null
+          ? null
+          : _matchOptionByAmount(
+              stockUpdate.amount!,
+              resolved.ambiguousOptions,
+            );
+
+      if (matchedOption != null) {
+        medication = matchedOption;
+      } else {
+        _pendingStockMedicationRequest = _PendingStockMedicationRequest(
+          medicationName: stockUpdate.medicationName,
+          count: stockUpdate.count,
+          request: _PendingDoseAmbiguityRequest(
+            amount: stockUpdate.amount,
+            options: resolved.ambiguousOptions,
+          ),
+        );
+
+        final labels = _uniqueDosageLabels(resolved.ambiguousOptions);
+        if (labels.isNotEmpty) {
+          return _buildStockDosagePrompt(stockUpdate.medicationName, labels);
+        }
+        return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+      }
+    } else {
+      return 'I could not find a medication matching "${stockUpdate.medicationName}".';
+    }
+
+    if (medication == null) {
+      return null;
+    }
+
+    final ensuredMedication =
+        await _doseLoggingService.ensureUserMedication(medication);
+    await _doseLoggingService.updateMedicationStock(
+      medicationId: ensuredMedication.id,
+      stockCount: stockUpdate.count,
+    );
+
+    return 'Updated stock for ${ensuredMedication.name} to ${stockUpdate.count}.';
   }
 
   Future<String> _logParsedDoseIntake(
@@ -1298,4 +1875,110 @@ class _PendingStockRequest {
 
   final String medicationId;
   final String medicationName;
+}
+
+class _PendingScheduleAmountRequest {
+  const _PendingScheduleAmountRequest({
+    required this.medication,
+    required this.scheduledTime,
+    required this.wasFromProduct,
+  });
+
+  final MedicationOption medication;
+  final DateTime scheduledTime;
+  final bool wasFromProduct;
+}
+
+class _PendingScheduleConfirmRequest {
+  const _PendingScheduleConfirmRequest({
+    required this.medication,
+    required this.scheduledTime,
+    required this.amount,
+    required this.wasFromProduct,
+  });
+
+  final MedicationOption medication;
+  final DateTime scheduledTime;
+  final ParsedDoseAmount? amount;
+  final bool wasFromProduct;
+}
+
+class _PendingStockMedicationRequest {
+  const _PendingStockMedicationRequest({
+    required this.medicationName,
+    required this.count,
+    required this.request,
+  });
+
+  final String medicationName;
+  final int count;
+  final _PendingDoseAmbiguityRequest request;
+}
+
+class _PendingDurationTimeRequest {
+  const _PendingDurationTimeRequest({
+    required this.medication,
+    required this.startDate,
+    required this.days,
+    required this.amount,
+    required this.wasFromProduct,
+  });
+
+  final MedicationOption medication;
+  final DateTime startDate;
+  final int days;
+  final ParsedDoseAmount? amount;
+  final bool wasFromProduct;
+}
+
+class _PendingDurationAmountRequest {
+  const _PendingDurationAmountRequest({
+    required this.medication,
+    required this.startDate,
+    required this.days,
+    required this.timeOfDay,
+    required this.wasFromProduct,
+  });
+
+  final MedicationOption medication;
+  final DateTime startDate;
+  final int days;
+  final DateTime timeOfDay;
+  final bool wasFromProduct;
+}
+
+class _PendingDurationConfirmRequest {
+  const _PendingDurationConfirmRequest({
+    required this.medication,
+    required this.startDate,
+    required this.days,
+    required this.timeOfDay,
+    required this.amount,
+    required this.wasFromProduct,
+  });
+
+  final MedicationOption medication;
+  final DateTime startDate;
+  final int days;
+  final DateTime timeOfDay;
+  final ParsedDoseAmount? amount;
+  final bool wasFromProduct;
+}
+
+class _PendingDurationMedicationRequest {
+  const _PendingDurationMedicationRequest({
+    required this.request,
+    required this.medicationName,
+    required this.startDate,
+    required this.days,
+    required this.timeOfDay,
+    required this.amount,
+  });
+
+  final _PendingDoseAmbiguityRequest request;
+  final String medicationName;
+  final DateTime startDate;
+  final int days;
+  final DateTime? timeOfDay;
+  final ParsedDoseAmount? amount;
 }

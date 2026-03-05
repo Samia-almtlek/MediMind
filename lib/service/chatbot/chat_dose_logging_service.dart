@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:medimind/data/repositories_impl/dose_log_repository_impl.dart';
+import 'package:medimind/domain/entities/dose_log_entity.dart';
+import 'package:medimind/core/notification/notification_service.dart';
 import 'package:medimind/service/database/firestore_service.dart';
 
 class ParsedDoseAmount {
@@ -23,6 +25,46 @@ class ParsedDoseIntake {
   final ParsedDoseAmount? amount;
 
   bool get hasAmount => amount != null;
+}
+
+class ParsedScheduleRequest {
+  const ParsedScheduleRequest({
+    required this.medicationName,
+    required this.scheduledTime,
+    this.amount,
+  });
+
+  final String medicationName;
+  final DateTime scheduledTime;
+  final ParsedDoseAmount? amount;
+}
+
+class ParsedDurationScheduleRequest {
+  const ParsedDurationScheduleRequest({
+    required this.medicationName,
+    required this.days,
+    required this.startDate,
+    this.timeOfDay,
+    this.amount,
+  });
+
+  final String medicationName;
+  final int days;
+  final DateTime startDate;
+  final DateTime? timeOfDay;
+  final ParsedDoseAmount? amount;
+}
+
+class ParsedStockUpdateRequest {
+  const ParsedStockUpdateRequest({
+    required this.medicationName,
+    required this.count,
+    this.amount,
+  });
+
+  final String medicationName;
+  final int count;
+  final ParsedDoseAmount? amount;
 }
 
 class MedicationOption {
@@ -98,6 +140,31 @@ class ChatDoseLoggingService {
     caseSensitive: false,
   );
 
+  static final RegExp _scheduleIntentRegex = RegExp(
+    r'\b(add|schedule|plan)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _timeRegex = RegExp(
+    r'\b(\d{1,2}):(\d{2})\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _durationRegex = RegExp(
+    r'\b(?:next|for)\s+(\d+)\s+day(?:s)?\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _durationIntentRegex = RegExp(
+    r'\b(i\s+will\s+take|i\s+am\s+taking|take)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _stockIntentRegex = RegExp(
+    r'\b(stock|units|update)\b|i\s+have\b',
+    caseSensitive: false,
+  );
+
   ParsedDoseIntake? parseDoseIntakeStatement(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty || !_intentRegex.hasMatch(trimmed)) {
@@ -145,6 +212,172 @@ class ChatDoseLoggingService {
     return ParsedDoseAmount(
       value: parsedValue,
       unit: _normalizeUnit(rawUnit),
+    );
+  }
+
+  ParsedScheduleRequest? parseScheduleRequest(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || !_scheduleIntentRegex.hasMatch(trimmed)) {
+      return null;
+    }
+
+    final timeMatch = _timeRegex.firstMatch(trimmed);
+    if (timeMatch == null) {
+      return null;
+    }
+
+    final hour = int.tryParse(timeMatch.group(1) ?? '');
+    final minute = int.tryParse(timeMatch.group(2) ?? '');
+    if (hour == null || minute == null) {
+      return null;
+    }
+
+    final lower = trimmed.toLowerCase();
+    final now = DateTime.now();
+    var baseDate = DateTime(now.year, now.month, now.day);
+    if (lower.contains('tomorrow')) {
+      baseDate = baseDate.add(const Duration(days: 1));
+    }
+
+    final scheduledTime = DateTime(
+      baseDate.year,
+      baseDate.month,
+      baseDate.day,
+      hour,
+      minute,
+    );
+
+    final amountMatch = _amountRegex.firstMatch(trimmed);
+    ParsedDoseAmount? parsedAmount;
+    if (amountMatch != null) {
+      final rawValue = amountMatch.group(1)?.replaceAll(',', '.');
+      final parsedValue = rawValue == null ? null : double.tryParse(rawValue);
+      final rawUnit = amountMatch.group(2);
+      if (parsedValue != null && rawUnit != null) {
+        parsedAmount = ParsedDoseAmount(
+          value: parsedValue,
+          unit: _normalizeUnit(rawUnit),
+        );
+      }
+    }
+
+    final medicationName =
+        _extractScheduleMedicationName(trimmed, timeMatch, amountMatch);
+    if (medicationName.isEmpty) {
+      return null;
+    }
+
+    return ParsedScheduleRequest(
+      medicationName: medicationName,
+      scheduledTime: scheduledTime,
+      amount: parsedAmount,
+    );
+  }
+
+  ParsedDurationScheduleRequest? parseDurationScheduleRequest(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || !_durationIntentRegex.hasMatch(trimmed)) {
+      return null;
+    }
+
+    final durationMatch = _durationRegex.firstMatch(trimmed);
+    if (durationMatch == null) {
+      return null;
+    }
+
+    final days = int.tryParse(durationMatch.group(1) ?? '');
+    if (days == null || days <= 0) {
+      return null;
+    }
+
+    final now = DateTime.now();
+    var startDate = DateTime(now.year, now.month, now.day);
+    if (trimmed.toLowerCase().contains('tomorrow')) {
+      startDate = startDate.add(const Duration(days: 1));
+    }
+
+    DateTime? timeOfDay;
+    final timeMatch = _timeRegex.firstMatch(trimmed);
+    if (timeMatch != null) {
+      final hour = int.tryParse(timeMatch.group(1) ?? '');
+      final minute = int.tryParse(timeMatch.group(2) ?? '');
+      if (hour != null && minute != null) {
+        timeOfDay = DateTime(startDate.year, startDate.month, startDate.day, hour, minute);
+      }
+    }
+
+    final amountMatch = _amountRegex.firstMatch(trimmed);
+    ParsedDoseAmount? parsedAmount;
+    if (amountMatch != null) {
+      final rawValue = amountMatch.group(1)?.replaceAll(',', '.');
+      final parsedValue = rawValue == null ? null : double.tryParse(rawValue);
+      final rawUnit = amountMatch.group(2);
+      if (parsedValue != null && rawUnit != null) {
+        parsedAmount = ParsedDoseAmount(
+          value: parsedValue,
+          unit: _normalizeUnit(rawUnit),
+        );
+      }
+    }
+
+    final medicationName = _extractDurationMedicationName(trimmed, durationMatch, timeMatch, amountMatch);
+    if (medicationName.isEmpty) {
+      return null;
+    }
+
+    return ParsedDurationScheduleRequest(
+      medicationName: medicationName,
+      days: days,
+      startDate: startDate,
+      timeOfDay: timeOfDay,
+      amount: parsedAmount,
+    );
+  }
+
+  ParsedStockUpdateRequest? parseStockUpdateRequest(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || !_stockIntentRegex.hasMatch(trimmed)) {
+      return null;
+    }
+
+    final amountMatch = _amountRegex.firstMatch(trimmed);
+    ParsedDoseAmount? parsedAmount;
+    var cleaned = trimmed;
+    if (amountMatch != null) {
+      final rawValue = amountMatch.group(1)?.replaceAll(',', '.');
+      final parsedValue = rawValue == null ? null : double.tryParse(rawValue);
+      final rawUnit = amountMatch.group(2);
+      if (parsedValue != null && rawUnit != null) {
+        parsedAmount = ParsedDoseAmount(
+          value: parsedValue,
+          unit: _normalizeUnit(rawUnit),
+        );
+      }
+      final amountText = amountMatch.group(0)?.trim() ?? '';
+      if (amountText.isNotEmpty) {
+        cleaned = cleaned.replaceFirst(RegExp(RegExp.escape(amountText), caseSensitive: false), ' ');
+      }
+    }
+
+    final countMatch = RegExp(r'\b(\d+)\b').firstMatch(cleaned);
+    final count = countMatch == null ? null : int.tryParse(countMatch.group(1) ?? '');
+    if (count == null) {
+      return null;
+    }
+
+    cleaned = cleaned.replaceFirst(RegExp(RegExp.escape(countMatch!.group(0) ?? ''), caseSensitive: false), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'\b(stock|units|update|to|have|i|my)\b', caseSensitive: false), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'[.!?]'), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (cleaned.isEmpty) {
+      return null;
+    }
+
+    return ParsedStockUpdateRequest(
+      medicationName: cleaned,
+      count: count,
+      amount: parsedAmount,
     );
   }
 
@@ -383,6 +616,100 @@ class ChatDoseLoggingService {
     return const DoseLogWriteResult(linkedToPlannedDose: false);
   }
 
+  Future<bool> hasScheduledDoseAtTime({
+    required String medicationId,
+    required DateTime scheduledTime,
+  }) async {
+    final start = scheduledTime.subtract(const Duration(minutes: 1));
+    final end = scheduledTime.add(const Duration(minutes: 1));
+
+    final snapshot = await _firestore
+        .collection('user_medications')
+        .doc(medicationId)
+        .collection('dose_logs')
+        .where('status', isEqualTo: 'pending')
+        .where('geplandeTijd',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('geplandeTijd', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .limit(1)
+        .get();
+
+    return snapshot.docs.isNotEmpty;
+  }
+
+  Future<void> scheduleDose({
+    required MedicationOption medication,
+    required DateTime scheduledTime,
+    ParsedDoseAmount? amount,
+  }) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw StateError('No authenticated user is available.');
+    }
+
+    final doseId = _firestore.collection('temp').doc().id;
+    final baseNotificationId = doseId.hashCode.abs();
+    final amountText = amount == null ? null : _buildAmountText(amount);
+
+    final dose = DoseLogEntity(
+      id: doseId,
+      userId: userId,
+      medicatieId: medication.id,
+      medicatieNaam: medication.name,
+      geplandeTijd: scheduledTime,
+      status: 'pending',
+      ingenomenTijd: null,
+      reminderCount: 0,
+      escalatieVerzonden: false,
+      scheduledNotificationIds: [
+        baseNotificationId,
+        baseNotificationId + 1,
+        baseNotificationId + 2,
+      ],
+      takenAmountValue: amount?.value,
+      takenAmountUnit: amount?.unit,
+      takenAmountText: amountText,
+      source: 'chat',
+    );
+
+    await _doseLogRepository.addDoseLog(dose);
+
+    if (scheduledTime.isAfter(DateTime.now())) {
+      await NotificationService.instance.scheduleDoseWithReminderLoop(
+        medicatieId: medication.id,
+        doseId: doseId,
+        baseId: baseNotificationId,
+        scheduledTime: scheduledTime,
+        medicationName: medication.name,
+      );
+    }
+  }
+
+  Future<void> scheduleDurationDoses({
+    required MedicationOption medication,
+    required DateTime startDate,
+    required int days,
+    required int hour,
+    required int minute,
+    ParsedDoseAmount? amount,
+  }) async {
+    for (var i = 0; i < days; i++) {
+      final scheduledTime = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+        hour,
+        minute,
+      ).add(Duration(days: i));
+
+      await scheduleDose(
+        medication: medication,
+        scheduledTime: scheduledTime,
+        amount: amount,
+      );
+    }
+  }
+
   String _extractMedicationName(String input, RegExpMatch? amountMatch) {
     final intentMatch = _intentRegex.firstMatch(input);
     if (intentMatch == null) {
@@ -413,6 +740,75 @@ class ChatDoseLoggingService {
     );
     tail = tail.replaceAll(RegExp(r'\s+'), ' ').trim();
     return tail;
+  }
+
+  String _extractScheduleMedicationName(
+    String input,
+    RegExpMatch timeMatch,
+    RegExpMatch? amountMatch,
+  ) {
+    var cleaned = input;
+
+    final timeText = timeMatch.group(0);
+    if (timeText != null) {
+      cleaned = cleaned.replaceFirst(timeText, ' ');
+    }
+
+    if (amountMatch != null) {
+      final amountText = amountMatch.group(0)?.trim() ?? '';
+      if (amountText.isNotEmpty) {
+        cleaned = cleaned.replaceFirst(
+          RegExp(RegExp.escape(amountText), caseSensitive: false),
+          ' ',
+        );
+      }
+    }
+
+    cleaned = cleaned.replaceAll(_schedulePhraseRegex, ' ');
+    cleaned = cleaned.replaceAll(_scheduleVerbRegex, ' ');
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\b(add|to|my|schedule|plan|planner|for|tomorrow|today|at)\b',
+        caseSensitive: false,
+      ),
+      ' ',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'[.!?]'), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return cleaned;
+  }
+
+  String _extractDurationMedicationName(
+    String input,
+    RegExpMatch durationMatch,
+    RegExpMatch? timeMatch,
+    RegExpMatch? amountMatch,
+  ) {
+    var cleaned = input;
+
+    final durationText = durationMatch.group(0);
+    if (durationText != null) {
+      cleaned = cleaned.replaceFirst(durationText, ' ');
+    }
+
+    final timeText = timeMatch?.group(0);
+    if (timeText != null) {
+      cleaned = cleaned.replaceFirst(timeText, ' ');
+    }
+
+    final amountText = amountMatch?.group(0)?.trim() ?? '';
+    if (amountText.isNotEmpty) {
+      cleaned = cleaned.replaceFirst(RegExp(RegExp.escape(amountText), caseSensitive: false), ' ');
+    }
+
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\b(i|will|take|am|taking|for|next|days|day|tomorrow|today|at)\b', caseSensitive: false),
+      ' ',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'[.!?]'), ' ');
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return cleaned;
   }
 
   String _normalizeName(String value) {
