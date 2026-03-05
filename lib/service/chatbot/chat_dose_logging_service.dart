@@ -29,10 +29,16 @@ class MedicationOption {
   const MedicationOption({
     required this.id,
     required this.name,
+    this.dosage = '',
+    this.productId = '',
+    this.isFromProduct = false,
   });
 
   final String id;
   final String name;
+  final String dosage;
+  final String productId;
+  final bool isFromProduct;
 }
 
 class MedicationResolveResult {
@@ -70,6 +76,8 @@ class ChatDoseLoggingService {
   final FirebaseAuth _auth;
   final DoseLogRepositoryImpl _doseLogRepository;
 
+  static const int _maxProductsToScan = 500;
+
   static final RegExp _intentRegex = RegExp(
     r'\b(i\s+(?:just\s+)?took|i\s+have\s+taken|just\s+took|took)\b',
     caseSensitive: false,
@@ -77,6 +85,16 @@ class ChatDoseLoggingService {
 
   static final RegExp _amountRegex = RegExp(
     r'(\d+(?:[\.,]\d+)?)\s*(mg|g|ml|mcg|μg|ug|tablet(?:s)?|pill(?:s)?|capsule(?:s)?)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _schedulePhraseRegex = RegExp(
+    r'\badd(?:\s+(?:this|it))?\s+to\s+(?:my\s+)?(?:schedule|plan|planner)\b',
+    caseSensitive: false,
+  );
+
+  static final RegExp _scheduleVerbRegex = RegExp(
+    r'\bschedule(?:\s+(?:this|it))?\b',
     caseSensitive: false,
   );
 
@@ -130,6 +148,17 @@ class ChatDoseLoggingService {
     );
   }
 
+  ParsedDoseAmount? parseOptionDosage(MedicationOption option) {
+    if (option.dosage.trim().isEmpty) {
+      return null;
+    }
+    return parseDoseAmount(option.dosage);
+  }
+
+  String normalizeMedicationName(String value) {
+    return _normalizeName(value);
+  }
+
   Future<MedicationResolveResult> resolveMedication(String requestedName) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null || requestedName.trim().isEmpty) {
@@ -156,6 +185,8 @@ class ChatDoseLoggingService {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final name = (data['name'] as String?)?.trim() ?? '';
+      final dosage = (data['dosage'] as String?)?.trim() ?? '';
+      final productId = (data['productId'] as String?)?.trim() ?? '';
       if (name.isEmpty) {
         continue;
       }
@@ -167,7 +198,13 @@ class ChatDoseLoggingService {
       }
 
       scored.add((
-        option: MedicationOption(id: doc.id, name: name),
+        option: MedicationOption(
+          id: doc.id,
+          name: name,
+          dosage: dosage,
+          productId: productId,
+          isFromProduct: false,
+        ),
         score: score,
       ));
     }
@@ -188,6 +225,72 @@ class ChatDoseLoggingService {
     }
 
     return MedicationResolveResult(ambiguousOptions: bestMatches.take(4).toList());
+  }
+
+  Future<MedicationResolveResult> resolveMedicationOrProduct(
+    String requestedName,
+  ) async {
+    final userResult = await resolveMedication(requestedName);
+    if (userResult.isMatched || userResult.isAmbiguous) {
+      return userResult;
+    }
+
+    return _resolveProductMatches(requestedName);
+  }
+
+  Future<MedicationOption> ensureUserMedication(
+    MedicationOption option,
+  ) async {
+    if (!option.isFromProduct) {
+      return option;
+    }
+
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw StateError('No authenticated user is available.');
+    }
+
+    final now = DateTime.now();
+    final nowTimestamp = Timestamp.fromDate(now);
+    final timeLabel =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final newId = _firestore.collection('user_medications').doc().id;
+
+    await _firestore.collection('user_medications').doc(newId).set({
+      'userId': userId,
+      'productId': option.productId,
+      'name': option.name,
+      'dosage': option.dosage,
+      'frequencyPerDay': 1,
+      'startDate': nowTimestamp,
+      'endDate': null,
+      'instructions': 'Added via chat',
+      'intakeTimes': <String>[timeLabel],
+      'isActive': true,
+      'aangemaaktViaOCR': false,
+      'initialStock': 0,
+      'currentStock': 0,
+      'lowStockThresholdDays': 3,
+      'lastStockAlertAt': null,
+    });
+
+    return MedicationOption(
+      id: newId,
+      name: option.name,
+      dosage: option.dosage,
+      productId: option.productId,
+      isFromProduct: false,
+    );
+  }
+
+  Future<void> updateMedicationStock({
+    required String medicationId,
+    required int stockCount,
+  }) async {
+    await _firestore.collection('user_medications').doc(medicationId).update({
+      'initialStock': stockCount,
+      'currentStock': stockCount,
+    });
   }
 
   Future<DoseLogWriteResult> logTakenDose({
@@ -288,6 +391,9 @@ class ChatDoseLoggingService {
 
     var tail = input.substring(intentMatch.end).trim();
 
+    tail = tail.replaceAll(_schedulePhraseRegex, ' ');
+    tail = tail.replaceAll(_scheduleVerbRegex, ' ');
+
     if (amountMatch != null) {
       final amountText = amountMatch.group(0)?.trim() ?? '';
       if (amountText.isNotEmpty) {
@@ -346,6 +452,98 @@ class ChatDoseLoggingService {
     }
 
     return 40;
+  }
+
+  Future<MedicationResolveResult> _resolveProductMatches(
+    String requestedName,
+  ) async {
+    final normalizedRequested = _normalizeName(requestedName);
+    if (normalizedRequested.isEmpty) {
+      return const MedicationResolveResult();
+    }
+
+    final directSnapshot = await _firestore
+        .collection('product')
+        .where('name_lower', isEqualTo: normalizedRequested)
+        .limit(4)
+        .get();
+
+    if (directSnapshot.docs.isNotEmpty) {
+      final options = directSnapshot.docs
+          .map((doc) => _productDocToOption(doc.id, doc.data()))
+          .where((option) => option != null)
+          .cast<MedicationOption>()
+          .toList();
+
+      if (options.length == 1) {
+        return MedicationResolveResult(matched: options.first);
+      }
+
+      if (options.isNotEmpty) {
+        return MedicationResolveResult(ambiguousOptions: options.take(4).toList());
+      }
+    }
+
+    final snapshot = await _firestore
+        .collection('product')
+        .limit(_maxProductsToScan)
+        .get();
+
+    final scored = <({MedicationOption option, int score})>[];
+
+    for (final doc in snapshot.docs) {
+      final option = _productDocToOption(doc.id, doc.data());
+      if (option == null) {
+        continue;
+      }
+
+      final normalizedName = _normalizeName(option.name);
+      final score = _scoreMatch(normalizedRequested, normalizedName);
+      if (score <= 0) {
+        continue;
+      }
+
+      scored.add((option: option, score: score));
+    }
+
+    if (scored.isEmpty) {
+      return const MedicationResolveResult();
+    }
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    final bestScore = scored.first.score;
+    final bestMatches = scored
+        .where((entry) => entry.score == bestScore)
+        .map((entry) => entry.option)
+        .toList();
+
+    if (bestMatches.length == 1) {
+      return MedicationResolveResult(matched: bestMatches.first);
+    }
+
+    return MedicationResolveResult(ambiguousOptions: bestMatches.take(4).toList());
+  }
+
+  MedicationOption? _productDocToOption(
+    String docId,
+    Map<String, dynamic> data,
+  ) {
+    final name = (data['name'] as String?)?.trim() ?? '';
+    if (name.isEmpty) {
+      return null;
+    }
+
+    final dosageRaw = (data['dosage'] as String?)?.trim() ??
+        (data['dose'] as String?)?.trim() ??
+        '';
+
+    return MedicationOption(
+      id: docId,
+      name: name,
+      dosage: dosageRaw,
+      productId: docId,
+      isFromProduct: true,
+    );
   }
 
   String _normalizeUnit(String rawUnit) {

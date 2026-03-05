@@ -32,7 +32,9 @@ class _ChatScreenState extends State<ChatScreen> {
   late final ChatDoseLoggingService _doseLoggingService;
   String? _sessionId;
   _PendingDoseAmountRequest? _pendingDoseAmountRequest;
+  _PendingDoseDosageRequest? _pendingDoseDosageRequest;
   _PendingDoseAmbiguityRequest? _pendingDoseAmbiguityRequest;
+  _PendingStockRequest? _pendingStockRequest;
   final GlobalKey _keyAssistantBadge = GlobalKey();
   final GlobalKey _keyMessages = GlobalKey();
   final GlobalKey _keyInput = GlobalKey();
@@ -347,9 +349,113 @@ class _ChatScreenState extends State<ChatScreen> {
     return '$valueText ${amount.unit}';
   }
 
+  String _formatMedicationOptionLabel(MedicationOption option) {
+    final dosage = option.dosage.trim();
+    if (dosage.isEmpty) {
+      return option.name;
+    }
+    return '${option.name} ($dosage)';
+  }
+
   String _buildAmbiguousMedicationPrompt(List<MedicationOption> options) {
-    final labels = options.take(3).map((option) => option.name).join(', ');
+    final labels = options
+        .take(3)
+        .map(_formatMedicationOptionLabel)
+        .join(', ');
     return 'I found multiple medications matching that name ($labels). Which one should I log this dose for?';
+  }
+
+  String _buildDosagePrompt(String medicationName, List<String> dosageLabels) {
+    final labels = [...dosageLabels, 'other'].join(', ');
+    return 'I found multiple dosages for $medicationName ($labels). Which one should I log?';
+  }
+
+  bool _isOtherChoice(String userText) {
+    return RegExp(r'\bother\b', caseSensitive: false).hasMatch(userText);
+  }
+
+  bool _dosageMatches(ParsedDoseAmount a, ParsedDoseAmount b) {
+    final unitMatch = a.unit.toLowerCase() == b.unit.toLowerCase();
+    final valueMatch = (a.value - b.value).abs() < 0.0001;
+    return unitMatch && valueMatch;
+  }
+
+  MedicationOption? _matchOptionByAmount(
+    ParsedDoseAmount amount,
+    List<MedicationOption> options,
+  ) {
+    final matching = <MedicationOption>[];
+    for (final option in options) {
+      final parsed = _doseLoggingService.parseOptionDosage(option);
+      if (parsed != null && _dosageMatches(amount, parsed)) {
+        matching.add(option);
+      }
+    }
+
+    if (matching.length == 1) {
+      return matching.first;
+    }
+    return null;
+  }
+
+  int? _parseStockCount(String userText) {
+    final match = RegExp(r'\b\d+\b').firstMatch(userText);
+    if (match == null) {
+      return null;
+    }
+    return int.tryParse(match.group(0) ?? '');
+  }
+
+  String _appendStockPrompt(String response, MedicationOption medication) {
+    _pendingStockRequest = _PendingStockRequest(
+      medicationId: medication.id,
+      medicationName: medication.name,
+    );
+    return '$response How many units do you have left for ${medication.name}?';
+  }
+
+  List<String> _uniqueDosageLabels(List<MedicationOption> options) {
+    final labels = <String>[];
+    for (final option in options) {
+      final dosage = option.dosage.trim();
+      if (dosage.isEmpty) {
+        continue;
+      }
+      if (!labels.contains(dosage)) {
+        labels.add(dosage);
+      }
+    }
+    return labels;
+  }
+
+  bool _optionsShareName(
+    String medicationName,
+    List<MedicationOption> options,
+  ) {
+    final requested = _doseLoggingService.normalizeMedicationName(medicationName);
+    if (requested.isEmpty) {
+      return false;
+    }
+
+    final normalizedNames = <String>{};
+    for (final option in options) {
+      final normalized = _doseLoggingService.normalizeMedicationName(option.name);
+      if (normalized.isNotEmpty) {
+        normalizedNames.add(normalized);
+      }
+    }
+
+    if (normalizedNames.isEmpty) {
+      return false;
+    }
+
+    if (normalizedNames.length == 1) {
+      return true;
+    }
+
+    return normalizedNames.every(
+      (name) => name.contains(requested) || requested.contains(name),
+    );
   }
 
   MedicationOption? _resolveAmbiguousMedicationReply(
@@ -367,12 +473,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final exact = request.options.where((option) {
-      final normalizedName = option.name
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
-      return normalizedName == normalizedReply;
+      final normalizedName = _doseLoggingService
+        .normalizeMedicationName(option.name)
+        .replaceAll(RegExp(r'\s+'), ' ');
+      final normalizedLabel = _doseLoggingService
+        .normalizeMedicationName(_formatMedicationOptionLabel(option))
+        .replaceAll(RegExp(r'\s+'), ' ');
+      return normalizedName == normalizedReply ||
+        normalizedLabel == normalizedReply;
     }).toList();
 
     if (exact.length == 1) {
@@ -380,13 +488,16 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final contained = request.options.where((option) {
-      final normalizedName = option.name
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
+      final normalizedName = _doseLoggingService
+        .normalizeMedicationName(option.name)
+        .replaceAll(RegExp(r'\s+'), ' ');
+      final normalizedLabel = _doseLoggingService
+        .normalizeMedicationName(_formatMedicationOptionLabel(option))
+        .replaceAll(RegExp(r'\s+'), ' ');
       return normalizedName.contains(normalizedReply) ||
-          normalizedReply.contains(normalizedName);
+        normalizedReply.contains(normalizedName) ||
+        normalizedLabel.contains(normalizedReply) ||
+        normalizedReply.contains(normalizedLabel);
     }).toList();
 
     if (contained.length == 1) {
@@ -397,6 +508,21 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<String?> _tryHandleDoseLoggingIntent(String userText) async {
+    final pendingStock = _pendingStockRequest;
+    if (pendingStock != null) {
+      final count = _parseStockCount(userText);
+      if (count == null) {
+        return 'Please share a number so I can update your stock for ${pendingStock.medicationName}.';
+      }
+
+      await _doseLoggingService.updateMedicationStock(
+        medicationId: pendingStock.medicationId,
+        stockCount: count,
+      );
+      _pendingStockRequest = null;
+      return 'Got it. I updated your stock for ${pendingStock.medicationName}.';
+    }
+
     final pendingAmbiguity = _pendingDoseAmbiguityRequest;
     if (pendingAmbiguity != null) {
       final selectedMedication =
@@ -405,17 +531,103 @@ class _ChatScreenState extends State<ChatScreen> {
         return _buildAmbiguousMedicationPrompt(pendingAmbiguity.options);
       }
 
+      final wasFromProduct = selectedMedication.isFromProduct;
+      final ensuredMedication =
+          await _doseLoggingService.ensureUserMedication(selectedMedication);
+
+      final amount = pendingAmbiguity.amount;
+      if (amount == null) {
+        _pendingDoseAmbiguityRequest = null;
+        final parsedDosage =
+            _doseLoggingService.parseOptionDosage(ensuredMedication);
+        if (parsedDosage != null) {
+          final parsed = ParsedDoseIntake(
+            medicationName: ensuredMedication.name,
+            amount: parsedDosage,
+          );
+          return _logParsedDoseIntake(
+            parsed,
+            preferredMedication: ensuredMedication,
+          );
+        }
+
+        _pendingDoseAmountRequest = _PendingDoseAmountRequest(
+          medicationName: ensuredMedication.name,
+          preferredMedication: ensuredMedication,
+        );
+        _pendingDoseAmountRequest = _PendingDoseAmountRequest(
+          medicationName: ensuredMedication.name,
+          preferredMedication: ensuredMedication,
+          promptForStock: wasFromProduct,
+        );
+        return 'I can log that. Please specify the amount and unit for ${ensuredMedication.name} (example: 200 mg).';
+      }
+
       final writeResult = await _doseLoggingService.logTakenDose(
-        medication: selectedMedication,
-        amount: pendingAmbiguity.amount,
+        medication: ensuredMedication,
+        amount: amount,
       );
 
       _pendingDoseAmbiguityRequest = null;
-      final amountText = _formatDoseAmount(pendingAmbiguity.amount);
+      final amountText = _formatDoseAmount(amount);
       if (writeResult.linkedToPlannedDose) {
-        return 'Logged $amountText of ${selectedMedication.name} as taken and matched it to your planned dose.';
+        final response =
+          'Logged $amountText of ${ensuredMedication.name} as taken and matched it to your planned dose.';
+        return wasFromProduct
+          ? _appendStockPrompt(response, ensuredMedication)
+          : response;
       }
-      return 'Logged $amountText of ${selectedMedication.name} as taken for today.';
+        final response =
+          'Logged $amountText of ${ensuredMedication.name} as taken for today.';
+        return wasFromProduct
+          ? _appendStockPrompt(response, ensuredMedication)
+          : response;
+    }
+
+    final pendingDosage = _pendingDoseDosageRequest;
+    if (pendingDosage != null) {
+      if (_isOtherChoice(userText)) {
+        _pendingDoseDosageRequest = null;
+        _pendingDoseAmountRequest = _PendingDoseAmountRequest(
+          medicationName: pendingDosage.medicationName,
+          preferredMedication: pendingDosage.options.first,
+          promptForStock: true,
+        );
+        return 'Please provide both amount and unit so I can log it (example: 200 mg).';
+      }
+
+      final parsedAmount = _doseLoggingService.parseDoseAmount(userText);
+      if (parsedAmount == null) {
+        return _buildDosagePrompt(
+          pendingDosage.medicationName,
+          _uniqueDosageLabels(pendingDosage.options),
+        );
+      }
+
+      final matchedOption =
+          _matchOptionByAmount(parsedAmount, pendingDosage.options);
+      if (matchedOption == null) {
+        return _buildDosagePrompt(
+          pendingDosage.medicationName,
+          _uniqueDosageLabels(pendingDosage.options),
+        );
+      }
+
+      final wasFromProduct = matchedOption.isFromProduct;
+      final ensuredMedication =
+          await _doseLoggingService.ensureUserMedication(matchedOption);
+      _pendingDoseDosageRequest = null;
+      final parsed = ParsedDoseIntake(
+        medicationName: ensuredMedication.name,
+        amount: parsedAmount,
+      );
+      final response = await _logParsedDoseIntake(
+        parsed,
+        preferredMedication: ensuredMedication,
+      );
+      return wasFromProduct
+          ? _appendStockPrompt(response, ensuredMedication)
+          : response;
     }
 
     final pendingAmount = _pendingDoseAmountRequest;
@@ -431,7 +643,18 @@ class _ChatScreenState extends State<ChatScreen> {
         amount: parsedAmount,
       );
 
-      return _logParsedDoseIntake(parsed);
+      final response = await _logParsedDoseIntake(
+        parsed,
+        preferredMedication: pendingAmount.preferredMedication,
+      );
+      if (pendingAmount.promptForStock &&
+          pendingAmount.preferredMedication != null) {
+        return _appendStockPrompt(
+          response,
+          pendingAmount.preferredMedication!,
+        );
+      }
+      return response;
     }
 
     final parsed = _doseLoggingService.parseDoseIntakeStatement(userText);
@@ -439,44 +662,171 @@ class _ChatScreenState extends State<ChatScreen> {
       return null;
     }
 
-    if (!parsed.hasAmount) {
-      _pendingDoseAmountRequest =
-          _PendingDoseAmountRequest(medicationName: parsed.medicationName);
-      return 'I can log that. Please specify the amount and unit for ${parsed.medicationName} (example: 200 mg).';
-    }
+    final resolved =
+      await _doseLoggingService.resolveMedicationOrProduct(parsed.medicationName);
 
-    return _logParsedDoseIntake(parsed);
-  }
-
-  Future<String> _logParsedDoseIntake(ParsedDoseIntake parsed) async {
-    final amount = parsed.amount;
-    if (amount == null) {
-      return 'Please provide both amount and unit so I can log this dose.';
-    }
-
-    final resolved = await _doseLoggingService.resolveMedication(parsed.medicationName);
-    if (resolved.isMatched && resolved.matched != null) {
-      final writeResult = await _doseLoggingService.logTakenDose(
-        medication: resolved.matched!,
-        amount: amount,
-      );
-
-      final amountText = _formatDoseAmount(amount);
-      if (writeResult.linkedToPlannedDose) {
-        return 'Logged $amountText of ${resolved.matched!.name} as taken and matched it to your planned dose.';
+    if (parsed.hasAmount) {
+      if (resolved.isMatched && resolved.matched != null) {
+        final wasFromProduct = resolved.matched!.isFromProduct;
+        final ensuredMedication = await _doseLoggingService
+            .ensureUserMedication(resolved.matched!);
+        final response = await _logParsedDoseIntake(
+          parsed,
+          preferredMedication: ensuredMedication,
+        );
+        return wasFromProduct
+            ? _appendStockPrompt(response, ensuredMedication)
+            : response;
       }
-      return 'Logged $amountText of ${resolved.matched!.name} as taken for today.';
+
+      if (resolved.isAmbiguous) {
+        final matchedOption = _matchOptionByAmount(
+          parsed.amount!,
+          resolved.ambiguousOptions,
+        );
+        if (matchedOption != null) {
+          final wasFromProduct = matchedOption.isFromProduct;
+          final ensuredMedication =
+              await _doseLoggingService.ensureUserMedication(matchedOption);
+          final response = await _logParsedDoseIntake(
+            parsed,
+            preferredMedication: ensuredMedication,
+          );
+          return wasFromProduct
+              ? _appendStockPrompt(response, ensuredMedication)
+              : response;
+        }
+        _pendingDoseAmbiguityRequest = _PendingDoseAmbiguityRequest(
+          amount: parsed.amount!,
+          options: resolved.ambiguousOptions,
+        );
+        return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+      }
+
+      return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+    }
+
+    if (resolved.isMatched && resolved.matched != null) {
+      final wasFromProduct = resolved.matched!.isFromProduct;
+      final ensuredMedication =
+          await _doseLoggingService.ensureUserMedication(resolved.matched!);
+      final parsedDosage =
+          _doseLoggingService.parseOptionDosage(ensuredMedication);
+      if (parsedDosage != null) {
+        final withDosage = ParsedDoseIntake(
+          medicationName: ensuredMedication.name,
+          amount: parsedDosage,
+        );
+        final response = await _logParsedDoseIntake(
+          withDosage,
+          preferredMedication: ensuredMedication,
+        );
+        return wasFromProduct
+            ? _appendStockPrompt(response, ensuredMedication)
+            : response;
+      }
+
+      _pendingDoseAmountRequest = _PendingDoseAmountRequest(
+        medicationName: ensuredMedication.name,
+        preferredMedication: ensuredMedication,
+        promptForStock: wasFromProduct,
+      );
+      return 'I can log that. Please specify the amount and unit for ${ensuredMedication.name} (example: 200 mg).';
     }
 
     if (resolved.isAmbiguous) {
+      if (_optionsShareName(parsed.medicationName, resolved.ambiguousOptions)) {
+        final dosageLabels = _uniqueDosageLabels(resolved.ambiguousOptions);
+        if (dosageLabels.length == 1) {
+          final option = resolved.ambiguousOptions
+              .firstWhere((option) => option.dosage.trim().isNotEmpty,
+                  orElse: () => resolved.ambiguousOptions.first);
+          final wasFromProduct = option.isFromProduct;
+          final ensuredMedication =
+              await _doseLoggingService.ensureUserMedication(option);
+          final parsedDosage = _doseLoggingService.parseOptionDosage(option);
+          if (parsedDosage != null) {
+            final withDosage = ParsedDoseIntake(
+              medicationName: ensuredMedication.name,
+              amount: parsedDosage,
+            );
+            final response = await _logParsedDoseIntake(
+              withDosage,
+              preferredMedication: ensuredMedication,
+            );
+            return wasFromProduct
+                ? _appendStockPrompt(response, ensuredMedication)
+                : response;
+          }
+        }
+
+        if (dosageLabels.isNotEmpty) {
+          _pendingDoseDosageRequest = _PendingDoseDosageRequest(
+            medicationName: parsed.medicationName,
+            options: resolved.ambiguousOptions,
+          );
+          return _buildDosagePrompt(parsed.medicationName, dosageLabels);
+        }
+      }
+
       _pendingDoseAmbiguityRequest = _PendingDoseAmbiguityRequest(
-        amount: amount,
+        amount: null,
         options: resolved.ambiguousOptions,
       );
       return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
     }
 
     return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+  }
+
+  Future<String> _logParsedDoseIntake(
+    ParsedDoseIntake parsed, {
+    MedicationOption? preferredMedication,
+  }) async {
+    final amount = parsed.amount;
+    if (amount == null) {
+      return 'Please provide both amount and unit so I can log this dose.';
+    }
+
+    var medication = preferredMedication;
+    if (medication == null) {
+      final resolved =
+          await _doseLoggingService.resolveMedicationOrProduct(parsed.medicationName);
+      if (resolved.isMatched && resolved.matched != null) {
+        medication = resolved.matched;
+      } else if (resolved.isAmbiguous) {
+        final matchedOption =
+            _matchOptionByAmount(amount, resolved.ambiguousOptions);
+        if (matchedOption != null) {
+          medication = matchedOption;
+        } else {
+          _pendingDoseAmbiguityRequest = _PendingDoseAmbiguityRequest(
+            amount: amount,
+            options: resolved.ambiguousOptions,
+          );
+          return _buildAmbiguousMedicationPrompt(resolved.ambiguousOptions);
+        }
+      } else {
+        return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+      }
+    }
+
+    if (medication == null) {
+      return 'I could not find an active medication matching "${parsed.medicationName}". Please check the name or add it to your plan first.';
+    }
+
+    medication = await _doseLoggingService.ensureUserMedication(medication);
+
+    final writeResult = await _doseLoggingService.logTakenDose(
+      medication: medication,
+      amount: amount,
+    );
+
+    final amountText = _formatDoseAmount(amount);
+    if (writeResult.linkedToPlannedDose) {
+      return 'Logged $amountText of ${medication.name} as taken and matched it to your planned dose.';
+    }
+    return 'Logged $amountText of ${medication.name} as taken for today.';
   }
 
   Future<void> _handleSendMessage() async {
@@ -909,9 +1259,25 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 class _PendingDoseAmountRequest {
-  const _PendingDoseAmountRequest({required this.medicationName});
+  const _PendingDoseAmountRequest({
+    required this.medicationName,
+    this.preferredMedication,
+    this.promptForStock = false,
+  });
 
   final String medicationName;
+  final MedicationOption? preferredMedication;
+  final bool promptForStock;
+}
+
+class _PendingDoseDosageRequest {
+  const _PendingDoseDosageRequest({
+    required this.medicationName,
+    required this.options,
+  });
+
+  final String medicationName;
+  final List<MedicationOption> options;
 }
 
 class _PendingDoseAmbiguityRequest {
@@ -920,6 +1286,16 @@ class _PendingDoseAmbiguityRequest {
     required this.options,
   });
 
-  final ParsedDoseAmount amount;
+  final ParsedDoseAmount? amount;
   final List<MedicationOption> options;
+}
+
+class _PendingStockRequest {
+  const _PendingStockRequest({
+    required this.medicationId,
+    required this.medicationName,
+  });
+
+  final String medicationId;
+  final String medicationName;
 }
