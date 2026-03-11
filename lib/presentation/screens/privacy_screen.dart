@@ -18,46 +18,65 @@ class PrivacyScreen extends StatelessWidget {
     if (user == null) return;
 
     try {
-      //  Delete Firestore data FIRST
+      // 1. Delete Firestore Data (Do this while still authenticated)
+      // Delete main profile
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .delete();
+
+      // Delete Medical ID
       await FirebaseFirestore.instance
           .collection('medical_ids')
           .doc(user.uid)
           .delete();
 
+      // Delete User Medications
       final medsSnapshot = await FirebaseFirestore.instance
           .collection('user_medications')
           .where('userId', isEqualTo: user.uid)
           .get();
-
       for (var doc in medsSnapshot.docs) {
         await doc.reference.delete();
       }
 
-      //  Clear Hive
-      await Hive.box<String>('drugs').clear();
-      await Hive.box('medical_id_data').clear();
-      await Hive.box<Map>('medication_stock').clear();
+      // Delete Dose Logs
+      final doseSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('dose_logs')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+      for (var doc in doseSnapshot.docs) {
+        await doc.reference.delete();
+      }
 
-// Delete dose_logs if they exist
-final doseSnapshot = await FirebaseFirestore.instance
-    .collectionGroup('dose_logs')
-    .where('userId', isEqualTo: user.uid)
-    .get();
+      // 2. Clear Hive (The Error-Proof Way)
+      // First, close ALL boxes to prevent "Already Open" or Type errors
+      await Hive.close();
 
-for (var doc in doseSnapshot.docs) {
-  await doc.reference.delete();
-}
-      // Delete Auth account LAST
+      // Now delete the actual files from the phone's storage
+      final boxesToDelete = ['drugs', 'medical_id_data', 'medication_stock'];
+      for (var boxName in boxesToDelete) {
+        await Hive.deleteBoxFromDisk(boxName);
+      }
+
+      // 3. Delete Firebase Auth Account LAST
       await user.delete();
 
       if (!context.mounted) return;
 
+      // 4. Send them back to Login
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
     } catch (e) {
-      debugPrint("Error during deletion: $e");
+      debugPrint("Critical Error during deletion: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Account deletion failed. Please try again.")),
+        );
+      }
     }
   }
 
@@ -73,6 +92,9 @@ for (var doc in doseSnapshot.docs) {
         await user.reauthenticateWithCredential(credential);
         await _deleteEverything(context);
       } on FirebaseAuthException {
+        // Add this mounted check to prevent async gap errors
+        if (!context.mounted) return;
+
         String errorMessage = "Incorrect password.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -83,60 +105,16 @@ for (var doc in doseSnapshot.docs) {
   }
 
   void _showDeleteDialog(BuildContext context) {
-  final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _DeleteAccountDialog(
+        onConfirm: (password) {
+          _reauthenticateAndDelete(context, password);
+        },
+      ),
+    );
+  }
 
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text(
-        "Right to be Forgotten",
-        style: TextStyle(fontWeight: FontWeight.bold),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-              "Under GDPR, you have the right to have all your data erased permanently."),
-          const SizedBox(height: 15),
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              hintText: "Confirm with password",
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            passwordController.dispose();
-            Navigator.pop(dialogContext);
-          },
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          style:
-              ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-          onPressed: () {
-            if (passwordController.text.isNotEmpty) {
-              Navigator.pop(dialogContext);
-              _reauthenticateAndDelete(
-                  context, passwordController.text);
-            }
-            passwordController.dispose();
-          },
-          child: const Text(
-            "Delete Everything",
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      ],
-    ),
-  );
-}
   void _showInfoPopup(BuildContext context, String title, String content) {
     showDialog(
       context: context,
@@ -382,6 +360,72 @@ for (var doc in doseSnapshot.docs) {
         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+class _DeleteAccountDialog extends StatefulWidget {
+  final Function(String) onConfirm;
+
+  const _DeleteAccountDialog({required this.onConfirm});
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    // The controller is now safely disposed ONLY when the dialog is fully removed
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        "Right to be Forgotten",
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+              "Under GDPR, you have the right to have all your data erased permanently."),
+          const SizedBox(height: 15),
+          TextField(
+            controller: _passwordController,
+            obscureText: true,
+            decoration: InputDecoration(
+              hintText: "Confirm with password",
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          onPressed: () {
+            if (_passwordController.text.isNotEmpty) {
+              widget.onConfirm(_passwordController.text);
+              Navigator.pop(context);
+            }
+          },
+          child: const Text(
+            "Delete Everything",
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ],
     );
   }
 }
